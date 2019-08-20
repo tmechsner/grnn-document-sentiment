@@ -8,6 +8,7 @@ import pandas as pd
 from keras.preprocessing.sequence import pad_sequences
 
 
+
 def preprocess(path, name):
     # load data and extract text information as X and rating as y:
     data = pd.read_csv(path, sep="    ", header=None, engine='python', names=["full_review"])
