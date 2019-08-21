@@ -6,23 +6,14 @@ import gensim as gs
 import numpy as np
 import pandas as pd
 
-from typing import List, Dict, Tuple, Union
+from typing import Tuple, List, Dict, Union
 
-TWord = str
-TSentenceStr = List[TWord]
-TDocumentStr = List[TSentenceStr]
-
-TVocabIndex = int
-TSentenceInd = List[TVocabIndex]
-TDocumentInd = List[TSentenceInd]
-
-TRating = int
-TEmbedding = np.array
+from DocSenTypes import *
 
 
 class Preprocessor:
 
-    def __init__(self, w2v_path: str, prep_path: str):
+    def __init__(self, w2v_path: str="data/Word2Vec/", prep_path: str="data/Preprocessed/"):
         self._w2v_path = w2v_path
         self._prep_path = prep_path
 
@@ -60,7 +51,7 @@ class Preprocessor:
                 X_data_text[ii][jj] = sent.translate(str.maketrans('', '', string.punctuation))
                 X_data_text[ii][jj] = gs.utils.simple_preprocess(sent, min_len=1, max_len=20, deacc=True)
 
-        embedding, word2index = self._get_embedding(w2v_model_name)
+        embedding, word2index = self.get_embedding(w2v_model_name)
 
         X_data_index = self._words_to_vocab_index(X_data_text, word2index)
 
@@ -99,7 +90,7 @@ class Preprocessor:
                         sentence_ind.append(word2index[self._unknown_word_key])
         return documents_ind
 
-    def _get_embedding(self, w2v_model_name: str) -> Tuple[TEmbedding, Dict[TWord, TVocabIndex]]:
+    def get_embedding(self, w2v_model_name: str) -> Tuple[TEmbedding, Dict[TWord, TVocabIndex]]:
         """
         Load word embedding from the given word2vec model and extend it with vectors for unknown words and padding.
         :param w2v_model_name: Name of the word2vec model to use
@@ -111,19 +102,20 @@ class Preprocessor:
             raise FileNotFoundError(f"Can't find a Word2Vec model with name '{w2v_model_name}' on path '{self._w2v_path}'")
 
         model = gs.models.KeyedVectors.load(w2v_model_path)
-        kv = model.wv
+        wv = model.wv
         del model
         # embedding matrix is orderd by indices in model.wv.voacab
-        word2index = {token: token_index for token_index, token in enumerate(kv.index2word)}
-        embedding = np.load(w2v_word_vectors_path)
+        word2index = {token: token_index for token_index, token in enumerate(wv.index2word)}
+        # embedding = np.load(w2v_word_vectors_path)
+        embedding = wv.vectors
         unknown_vector = np.mean(embedding, axis=0)
         padding_vector = np.zeros(len(embedding[0]))
-        embedding = np.append(embedding, unknown_vector)  # vector for unknown words
-        embedding = np.append(embedding, padding_vector)
+        embedding = np.append(embedding, unknown_vector.reshape((1, -1)), axis=0)
+        embedding = np.append(embedding, padding_vector.reshape((1, -1)), axis=0)
         word2index[self._unknown_word_key] = len(embedding) - 2  # UNK = unknown words, map to vector we just appended
         return embedding, word2index
 
-    def word2vec(self, paths: Union[str, List[str]], name: str, overwrite: bool = True, sample_frac: float = 0.3) \
+    def word2vec(self, paths: Union[str, List[str]], name: str, dim: int = 200, overwrite: bool = True, sample_frac: float = 0.3) \
             -> Tuple[TEmbedding, Dict[TWord, TVocabIndex]]:
         w2v_model_path = os.path.join(self._w2v_path, f'{name}_w2v_model')
         w2v_corpus_path = os.path.join(self._w2v_path, f'{name}_w2v_corpus_train')
@@ -154,14 +146,14 @@ class Preprocessor:
             with open(w2v_corpus_path, "wb") as outfile:
                 pickle.dump(sentences_list, outfile)
 
-            model = gs.models.Word2Vec(sentences_list, size=200, window=5)
+            model = gs.models.Word2Vec(sentences_list, size=dim, window=5)
             model.save(w2v_model_path)
 
-        return self._get_embedding(name)
+        return self.get_embedding(name)
 
 
 if __name__ == '__main__':
-    p = Preprocessor(w2v_path="data/Word2Vec/", prep_path="data/Preprocessed/")
+    p = Preprocessor()
 
     p.word2vec(['emnlp-2015-data/imdb-train.txt.ss', 'emnlp-2015-data/yelp-2015-train.txt.ss'], 'imdb+yelp', overwrite=False)
 
