@@ -5,10 +5,11 @@ from typing import Tuple, Dict, Union
 
 import gensim as gs
 import pandas as pd
+import numpy as np
 from torch.utils.data import Dataset
 
-from DocSenTypes import *
-from Word2Vector import Word2Vector
+from src.DocSenTypes import *
+from src.Word2Vector import Word2Vector
 
 
 class ImdbDataset(Dataset):
@@ -46,8 +47,11 @@ class ImdbDataset(Dataset):
         self._X_data, self._y_data, self.embedding, self.word2index = self._load()
         self.index2word = {index: word for (word, index) in self.word2index.items()}
 
+        self.unknown_word_key = self._w2v.unknown_word_key
+        self.padding_word_key = self._w2v.padding_word_key
+
     def __getitem__(self, index):
-        return self._X_data[index], self._y_data[index]
+        return self._X_data[index], int(self._y_data[index])
 
     def __len__(self):
         return len(self._X_data)

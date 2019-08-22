@@ -1,13 +1,13 @@
 import os
 import pickle
 import string
-from typing import Tuple, List, Dict, Union
+from typing import Tuple, Dict, Union
 
 import numpy as np
 import pandas as pd
 import gensim as gs
 
-from DocSenTypes import *
+from src.DocSenTypes import *
 
 
 class Word2Vector:
@@ -20,7 +20,8 @@ class Word2Vector:
         self._sample_frac = sample_frac
         self._dim = dim
 
-        self.unknown_word_key = 'UNK'
+        self.unknown_word_key = '__UNK__'
+        self.padding_word_key = '__PAD__'
 
     def get_embedding(self) \
             -> Tuple[TEmbedding, Dict[TWord, TVocabIndex]]:
@@ -84,6 +85,7 @@ class Word2Vector:
         embedding = np.append(embedding, padding_vector.reshape((1, -1)), axis=0)
 
         word2index[self.unknown_word_key] = len(embedding) - 2  # map unknown words to vector we just appended
+        word2index[self.padding_word_key] = len(embedding) - 1
 
         return embedding, word2index
 
