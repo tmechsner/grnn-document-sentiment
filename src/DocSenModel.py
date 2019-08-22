@@ -5,21 +5,16 @@ import numpy as np
 
 from src.ImdbDataset import ImdbDataset
 
-from typing import Dict
-
-from src.DocSenTypes import *
 from src.DocumentPadCollate import DocumentPadCollate
 
 
 class DocSenModel(torch.nn.Module):
-    def __init__(self, embedding_matrix: np.array, word2idx: Dict[TWord, TVocabIndex], freeze_embedding: bool = True):
+    def __init__(self, embedding_matrix: np.array, freeze_embedding: bool = True):
         super(DocSenModel, self).__init__()
 
         self._word_embedding_dim = len(embedding_matrix[0])
         self._vocab_size = len(embedding_matrix)
 
-        # Call: embed(torch.from_numpy(np.array([id1, id2, ..., idn])))
-        #  => n-dim embedding vector of words with given vocab ids
         self._word_embedding = torch.nn.Embedding.from_pretrained(torch.from_numpy(embedding_matrix), freeze=freeze_embedding)
 
     def forward(self, X):
@@ -28,28 +23,14 @@ class DocSenModel(torch.nn.Module):
         return X
 
 
-if __name__ == '__main__':
-    num_epochs = 10
-    w2v_sample_frac = 0.9
-    data_path = 'data/Dev/imdb-dev.txt.ss'
-    data_name = 'imdb-dev'
-    freeze_embedding = True
-    batch_size = 16
-    validation_split = 0.2
-    shuffle_dataset = False
-    random_seed = 42
-    learning_rate = 0.03
-
-    dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac)
-
-    model = DocSenModel(dataset.embedding, dataset.word2index, freeze_embedding=freeze_embedding)
-
+def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split):
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
     split = int(np.floor(validation_split * dataset_size))
     if shuffle_dataset:
         np.random.seed(random_seed)
         np.random.shuffle(indices)
+
     train_indices, val_indices = indices[split:], indices[:split]
 
     train_sampler = sampler.SubsetRandomSampler(train_indices)
@@ -70,7 +51,6 @@ if __name__ == '__main__':
     for epoch in range(num_epochs):
         print(f'\nEpoch {epoch}')
         for batch_index, (documents, labels) in enumerate(train_loader):
-            # for i, doc in enumerate(documents):
             print(f'Batch {batch_index}: {labels}, {len(documents)}')
 
             # apply the model with the current parameters
@@ -96,3 +76,26 @@ if __name__ == '__main__':
             #
             # # compute a step of the optimizer based on the gradient
             # optimizer.step()
+
+
+def main():
+    num_epochs = 10
+    w2v_sample_frac = 0.9
+    data_path = 'data/Dev/imdb-dev.txt.ss'
+    data_name = 'imdb-dev'
+    freeze_embedding = True
+    batch_size = 16
+    validation_split = 0.2
+    shuffle_dataset = False
+    random_seed = 42
+    learning_rate = 0.03
+
+    dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac)
+
+    model = DocSenModel(dataset.embedding, freeze_embedding=freeze_embedding)
+
+    train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split)
+
+
+if __name__ == '__main__':
+    main()
