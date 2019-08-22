@@ -11,13 +11,15 @@ from typing import Dict
 from DocSenTypes import *
 
 
-class DocSenModel:
-    def __init__(self, embedding_matrix: np.array, word2idx: Dict[TWord, TVocabIndex]):
+class DocSenModel(nn.Module):
+    def __init__(self, embedding_matrix: np.array, word2idx: Dict[TWord, TVocabIndex], freeze_embedding: bool = True):
+        super(DocSenModel, self).__init__()
+
         self._word_embedding_dim = len(embedding_matrix[0])
         self._vocab_size = len(embedding_matrix)
 
         # Call: embed(torch.from_numpy(np.array([id1, id2, ..., idn]))) => n-dim embedding vector of words with given vocab ids
-        embed = nn.Embedding.from_pretrained(torch.from_numpy(embedding_matrix))
+        embed = nn.Embedding.from_pretrained(torch.from_numpy(embedding_matrix), freeze=freeze_embedding)
 
         pass
 
@@ -46,9 +48,7 @@ if __name__ == '__main__':
     train_loader = DataLoader(dataset, batch_size=batch_size, sampler=train_sampler)
     validation_loader = DataLoader(dataset, batch_size=batch_size, sampler=valid_sampler)
 
-    # Usage Example:
     num_epochs = 10
     for epoch in range(num_epochs):
-        # Train:
         for batch_index, (documents, labels) in enumerate(train_loader):
             pass
