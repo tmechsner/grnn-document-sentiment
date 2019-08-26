@@ -33,15 +33,22 @@ class DocSenModel(torch.nn.Module):
 
         num_sentences = len(doc)
         for i in range(0, num_sentences):
+            # Turn vocabulary ids into embedding vectors
             sentence = self._word_embedding(torch.tensor(doc[i]))
             num_words = len(sentence)
 
-            sentence = sentence.unsqueeze(2)  # Add third dimension for number of sentences (here: always equal to one)
+            # Add third dimension for number of sentences (here: always equal to one)
+            sentence = sentence.unsqueeze(2)
+
+            # And rearrange shape for Conv1D layers
             sentence = sentence.permute(2, 1, 0)
 
+            # We can't apply a convolution filter to an input that is smaller than the kernel size.
+            # Hence, we apply one filter after the other with increasing kernel size until it exceeds input size.
             conv = []
             for kernel_size in range(1, 4):
                 if num_words >= kernel_size:
+                    # Since the size of the sentences varies, we have to rebuild the avg pooling layer every iteration
                     pool_layer = torch.nn.AvgPool1d(num_words - kernel_size + 1)
                     pool_layer.double()
 
@@ -51,8 +58,9 @@ class DocSenModel(torch.nn.Module):
                     conv.append(X)
                 else:
                     break
-            X = torch.cat((conv[0], conv[1], conv[2])).mean(0)
 
+            # In the end merge the output of all applied pooling layers by averaging them
+            X = torch.cat(tuple(conv)).mean(0)
 
 
         return doc
@@ -81,11 +89,6 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
 
     train_sampler = sampler.SubsetRandomSampler(train_indices)
     valid_sampler = sampler.SubsetRandomSampler(val_indices)
-
-    # DataLoader srews up the data if they are of varying length.
-    # Like our data: documents have varying number of sentences and sentences have varying number of words.
-    # Thus we need to use a custom collate function that pads the documents' sentence lists and every sentence's word
-    # list before the document tensors get stacked.
 
     loss_function = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
