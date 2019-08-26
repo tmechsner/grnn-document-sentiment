@@ -16,10 +16,21 @@ class DocSenModel(torch.nn.Module):
         self._vocab_size = len(embedding_matrix)
 
         self._word_embedding = torch.nn.Embedding.from_pretrained(torch.from_numpy(embedding_matrix), freeze=freeze_embedding)
+        self._conv1d = torch.nn.Conv1d(200, 50, 1, stride=1, padding=0, padding_mode='zeros')
 
-    def forward(self, X):
+    def forward(self, X, pad_vector):
         X = self._word_embedding(X)
-        # torch.nn.utils.rnn.pack_padded_sequence(X, X_lengths, batch_first=True)
+
+        batch_size = X.shape[0]
+        for i in range(0, batch_size):
+            doc: torch.Tensor = X[i]
+            # Calculate lenghts of sentences
+            lengths = torch.randint(1, doc.shape[2], (doc.shape[0],))
+
+            packed = torch.nn.utils.rnn.pack_padded_sequence(doc, lengths, enforce_sorted=False, batch_first=True)
+
+            # X = lstm(packed)
+            pass
         return X
 
 
@@ -54,7 +65,7 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             print(f'Batch {batch_index}: {labels}, {len(documents)}')
 
             # apply the model with the current parameters
-            label_predicted = model(documents)
+            label_predicted = model(documents, dataset.embedding[dataset.word2index[dataset.padding_word_key]])
 
             # compute the loss and store it; note that the loss is an object
             # which we will also need to compute the gradient
@@ -93,6 +104,7 @@ def main():
     dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac)
 
     model = DocSenModel(dataset.embedding, freeze_embedding=freeze_embedding)
+    model.double()
 
     train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split)
 
