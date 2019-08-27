@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import sampler
 
-from src.DocSenModel import DocSenModelBuilder
+from src.DocSenModel import DocSenModel
 
 from src.ImdbDataloader import ImdbDataloader
 from src.ImdbDataset import ImdbDataset
@@ -35,6 +35,9 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
         print(f'\nEpoch {epoch}')
 
         for batch_num, batch in enumerate(dataloader):
+            if batch_num % 10 == 0:
+                print(f'  Batch {batch_num+1} of {len(dataloader)}')
+
             for (doc, label) in batch:
                 label_predicted = model(doc)
 
@@ -74,20 +77,18 @@ def main():
 
     dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac)
 
-    gnn_conv = DocSenModelBuilder(dataset.embedding)\
-        .with_conv_sentences()\
-        .with_gnn_last()\
-        .with_forward_gnn()\
-        .with_frozen_embedding(freeze_embedding)\
-        .build()
+    gnn_conv = DocSenModel(DocSenModel.SentenceModel.CONV,
+                           DocSenModel.GnnOutput.LAST,
+                           DocSenModel.GnnType.FORWARD,
+                           dataset.embedding,
+                           freeze_embedding)
     train(batch_size, dataset, learning_rate, gnn_conv, num_epochs, random_seed, shuffle_dataset, validation_split)
 
-    gnn_lstm = DocSenModelBuilder(dataset.embedding)\
-        .with_lstm_sentences()\
-        .with_gnn_last()\
-        .with_forward_gnn()\
-        .with_frozen_embedding(freeze_embedding)\
-        .build()
+    gnn_lstm = DocSenModel(DocSenModel.SentenceModel.LSTM,
+                           DocSenModel.GnnOutput.LAST,
+                           DocSenModel.GnnType.FORWARD,
+                           dataset.embedding,
+                           freeze_embedding)
     train(batch_size, dataset, learning_rate, gnn_lstm, num_epochs, random_seed, shuffle_dataset, validation_split)
 
 

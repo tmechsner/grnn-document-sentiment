@@ -23,6 +23,9 @@ class ImdbDataloader:
                 yield self._batch_iterator(batch_idx)
                 batch_idx = []
 
+    def __len__(self):
+        return len(self._sampler) // self._batch_size
+
     def _batch_iterator(self, batch: List[int]):
         for i in batch:
             (doc, label) = self._dataset[i]

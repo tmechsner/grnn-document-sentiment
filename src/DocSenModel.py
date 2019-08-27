@@ -16,7 +16,8 @@ class DocSenModel(torch.nn.Module):
         FORWARD = 1
         FORWARD_BACKWARD = 2
 
-    def __init__(self, sentence_model: SentenceModel, gnn_output: GnnOutput, gnn_type: GnnType, embedding_matrix: np.array, freeze_embedding: bool = False):
+    def __init__(self, sentence_model: SentenceModel, gnn_output: GnnOutput, gnn_type: GnnType,
+                 embedding_matrix: np.array, freeze_embedding: bool = False):
         super(DocSenModel, self).__init__()
 
         self._sentence_model = sentence_model
@@ -38,6 +39,8 @@ class DocSenModel(torch.nn.Module):
 
         self._tanh = torch.nn.Tanh()
 
+        self.double()
+
     def forward(self, doc):
         """
         Process a single document
@@ -48,8 +51,11 @@ class DocSenModel(torch.nn.Module):
         num_sentences = len(doc)
         for i in range(0, num_sentences):
             # Turn vocabulary ids into embedding vectors
-            sentence = self._word_embedding(torch.tensor(doc[i]))
+            sentence = self._word_embedding(torch.tensor(doc[i], dtype=torch.long))
             num_words = len(sentence)
+
+            if num_words == 0:
+                continue
 
             # Add third dimension for number of sentences (here: always equal to one)
             sentence = sentence.unsqueeze(2)
@@ -101,88 +107,3 @@ class DocSenModel(torch.nn.Module):
         # We only need the last output.
         sentence_rep = out[-1]
         return sentence_rep
-
-
-class DocSenModelBuilder:
-    def __init__(self, embedding_matrix: np.array):
-        self._embedding_matrix = embedding_matrix
-
-    def with_lstm_sentences(self):
-        """
-        Model sentences using an LSTM on the word vectors.
-        """
-        return DocSenModelBuilder._DocSenModelBuilderA(self, DocSenModel.SentenceModel.LSTM)
-
-    def with_conv_sentences(self):
-        """
-        Model sentences using three parallel convolutional filters with different kernel size.
-        """
-        return DocSenModelBuilder._DocSenModelBuilderA(self, DocSenModel.SentenceModel.CONV)
-
-    class _DocSenModelBuilderA:
-        def __init__(self, _0, conv_or_lstm: DocSenModel.SentenceModel):
-            self._0 = _0
-            self._conv_or_lstm = conv_or_lstm
-
-        def with_gnn_last(self):
-            """
-            Use only the last output of the sentence GNN chain.
-            """
-            return DocSenModelBuilder._DocSenModelBuilderB(self._0, self, DocSenModel.GnnOutput.LAST)
-
-        def with_gnn_avg(self):
-            """
-            Use an average of all outputs of the sentence GNN chain.
-            """
-            return DocSenModelBuilder._DocSenModelBuilderB(self._0, self, DocSenModel.GnnOutput.AVG)
-
-    class _DocSenModelBuilderB:
-        def __init__(self, _0, a, gnn_output: DocSenModel.GnnOutput):
-            self._0 = _0
-            self._a = a
-            self._gnn_output = gnn_output
-
-        def with_forward_gnn(self):
-            """
-            Process sentences in a forward GNN only.
-            """
-            return DocSenModelBuilder._DocSenModelBuilderC(self._0, self._a, self, DocSenModel.GnnType.FORWARD)
-
-        def with_forward_backward_gnn(self):
-            """
-            Process sentences in a forward and a backward GNN.
-            """
-            return DocSenModelBuilder._DocSenModelBuilderC(self._0, self._a, self, DocSenModel.GnnType.FORWARD_BACKWARD)
-
-    class _DocSenModelBuilderC:
-        def __init__(self, _0, a, b, gnn_type: DocSenModel.GnnType):
-            self._0 = _0
-            self._a = a
-            self._b = b
-            self._gnn_type = gnn_type
-
-        def with_frozen_embedding(self, frozen_embedding: bool = True):
-            """
-            (Don't) fine tune the word embeddings during training.
-            """
-            return DocSenModelBuilder._DocSenModelBuilderD(self._0, self._a, self._b, self, frozen_embedding)
-
-        def build(self):
-            return DocSenModel(self._a.conv_or_lstm, self._b.gnn_output, self._gnn_type, self._0.embedding_matrix)
-
-    class _DocSenModelBuilderD:
-        def __init__(self, _0, a, b, c, freeze_embedding):
-            self._0 = _0
-            self._a = a
-            self._b = b
-            self._c = c
-            self._freeze_embedding = freeze_embedding
-
-        def build(self):
-            """
-            Create a Document Sentiment Model with the specified configuration.
-            """
-            model = DocSenModel(self._a._conv_or_lstm, self._b._gnn_output, self._c._gnn_type,
-                                self._0._embedding_matrix, freeze_embedding=self._freeze_embedding)
-            model.double()
-            return model
