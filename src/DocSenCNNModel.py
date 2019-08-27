@@ -1,11 +1,10 @@
 import torch
-from torch.utils.data import sampler, DataLoader
+from torch.utils.data import sampler
 
 import numpy as np
 
+from src.ImdbDataloader import ImdbDataloader
 from src.ImdbDataset import ImdbDataset
-
-from src.DocumentPadCollate import DocumentPadCollate
 
 
 class DocSenModel(torch.nn.Module):
@@ -23,11 +22,10 @@ class DocSenModel(torch.nn.Module):
 
         self._tanh = torch.nn.Tanh()
 
-    def forward(self, doc, pad_vector):
+    def forward(self, doc):
         """
         Process single document
         :param doc:
-        :param pad_vector:
         :return:
         """
 
@@ -45,47 +43,43 @@ class DocSenModel(torch.nn.Module):
 
             # We can't apply a convolution filter to an input that is smaller than the kernel size.
             # Hence, we apply one filter after the other with increasing kernel size until it exceeds input size.
-            conv = []
+            conv_result = None
             for kernel_size in range(1, 4):
                 if num_words >= kernel_size:
                     # Since the size of the sentences varies, we have to rebuild the avg pooling layer every iteration
-                    pool_layer = torch.nn.AvgPool1d(num_words - kernel_size + 1)
-                    pool_layer.double()
+                    avg_pool_layer = torch.nn.AvgPool1d(num_words - kernel_size + 1)
+                    avg_pool_layer.double()
 
                     X = self._conv[kernel_size - 1](sentence)
-                    X = pool_layer(X)
+                    X = avg_pool_layer(X)
                     X = self._tanh(X)
-                    conv.append(X)
+
+                    # Concatenate results
+                    conv_result = X if conv_result is None else torch.cat((conv_result, X))
                 else:
                     break
 
             # In the end merge the output of all applied pooling layers by averaging them
-            X = torch.cat(tuple(conv)).mean(0)
+            sentence_rep = conv_result.mean(0)
 
 
-        return doc
+
+        return X
 
 
-def get_batch(batch_size, sampler: sampler.Sampler):
-    result = []
-    i = 0
-    for doc in sampler:
-        result.append(doc)
-        i += 1
-        if i == batch_size:
-            break
-    return result
-
-
-def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split):
+def split_data(dataset, random_seed, shuffle_dataset, validation_split):
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
     split = int(np.floor(validation_split * dataset_size))
     if shuffle_dataset:
         np.random.seed(random_seed)
         np.random.shuffle(indices)
+    return indices[split:], indices[:split]
 
-    train_indices, val_indices = indices[split:], indices[:split]
+
+def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split):
+
+    train_indices, val_indices = split_data(dataset, random_seed, shuffle_dataset, validation_split)
 
     train_sampler = sampler.SubsetRandomSampler(train_indices)
     valid_sampler = sampler.SubsetRandomSampler(val_indices)
@@ -93,21 +87,16 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
     loss_function = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
+    dataloader = ImdbDataloader(batch_size, train_sampler, dataset)
+
     learning_curve = []
     for epoch in range(num_epochs):
         print(f'\nEpoch {epoch}')
 
-        num_batches = len(train_indices) // batch_size
-        for i in range(num_batches):
-            batch = get_batch(batch_size, train_sampler)
-            docs = []
-            labels = []
-            for j in batch:
-                (doc, label) = dataset[j]
-                docs.append(doc)
-                labels.append(label)
+        for batch_num, batch in enumerate(dataloader):
+            for (doc, label) in batch:
                 # apply the model with the current parameters
-                label_predicted = model(doc, dataset.embedding[dataset.word2index[dataset.padding_word_key]])
+                label_predicted = model(doc)
 
             # compute the loss and store it; note that the loss is an object
             # which we will also need to compute the gradient
