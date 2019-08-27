@@ -17,7 +17,7 @@ class ImdbDataset(Dataset):
     def __init__(self, data_paths: Union[str, List[str]], name: str, w2v_model_name: str = None,
                  overwrite: bool = False,
                  embedding_dim: int = 200, w2v_sample_frac: float = 0.3,
-                 w2v_path: str = "data/Word2Vec/", prep_path: str = "data/Preprocessed/"):
+                 w2v_path: str = "../data/Word2Vec/", prep_path: str = "../data/Preprocessed/"):
         """
         Load a given IMDB rating dataset. If <overwrite> is true or there is no persisted data for the given <_name> yet,
         the data will be preprocessed and the results persisted under the given paths <w2v_path> and <prep_path>.

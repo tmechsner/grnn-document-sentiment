@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import sampler
 
-from src.DocSenModel import DocSenModel, DocSenModelBuilder
+from src.DocSenModel import DocSenModelBuilder
 
 from src.ImdbDataloader import ImdbDataloader
 from src.ImdbDataset import ImdbDataset
@@ -36,7 +36,6 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
 
         for batch_num, batch in enumerate(dataloader):
             for (doc, label) in batch:
-                # apply the model with the current parameters
                 label_predicted = model(doc)
 
             # compute the loss and store it; note that the loss is an object
@@ -64,7 +63,7 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
 def main():
     num_epochs = 10
     w2v_sample_frac = 0.9
-    data_path = 'data/Dev/imdb-dev.txt.ss'
+    data_path = '../data/Dev/imdb-dev.txt.ss'
     data_name = 'imdb-dev'
     freeze_embedding = True
     batch_size = 16
@@ -75,14 +74,21 @@ def main():
 
     dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac)
 
-    model = DocSenModelBuilder(dataset.embedding)\
+    gnn_conv = DocSenModelBuilder(dataset.embedding)\
         .with_conv_sentences()\
         .with_gnn_last()\
         .with_forward_gnn()\
         .with_frozen_embedding(freeze_embedding)\
         .build()
+    train(batch_size, dataset, learning_rate, gnn_conv, num_epochs, random_seed, shuffle_dataset, validation_split)
 
-    train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split)
+    gnn_lstm = DocSenModelBuilder(dataset.embedding)\
+        .with_lstm_sentences()\
+        .with_gnn_last()\
+        .with_forward_gnn()\
+        .with_frozen_embedding(freeze_embedding)\
+        .build()
+    train(batch_size, dataset, learning_rate, gnn_lstm, num_epochs, random_seed, shuffle_dataset, validation_split)
 
 
 if __name__ == '__main__':
