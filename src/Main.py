@@ -73,9 +73,6 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             loss_object = loss_function(predictions, labels)
             train_loss.append(loss_object.item())
 
-            if batch_num % 10 == 0:
-                print(f"  Batch {batch_num+1} of {len(dataloader_train)}. Loss: {train_loss[-1]}")
-
             # Reset the gradients in the optimizer.
             # Otherwise past computations would influence new computations.
             optimizer.zero_grad()
@@ -100,6 +97,10 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
 
             # Set model back to training mode
             model.train()
+
+            if batch_num % 10 == 0:
+                print(f"  Batch {batch_num+1} of {len(dataloader_train)}. Training-Loss: {train_loss[-1]} \t"
+                      f" Validation-Loss: {valid_loss[-1]}")
 
         print("Saving training progress checkpoint...")
         if os.path.isfile(checkpoint_path):
