@@ -46,12 +46,17 @@ class ImdbDataset(Dataset):
 
         self._X_data, self._y_data, self.embedding, self.word2index = self._load()
         self.index2word = {index: word for (word, index) in self.word2index.items()}
+        self.classes = sorted([int(y) for y in set(self._y_data)])
+        self.num_classes = len(self.classes)
 
         self.unknown_word_key = self._w2v.unknown_word_key
         self.padding_word_key = self._w2v.padding_word_key
 
     def __getitem__(self, index):
-        return self._X_data[index], int(self._y_data[index])
+        """
+        Get tuple of data and label, where the label is the index of the class in ImdbDataset.classes.
+        """
+        return self._X_data[index], self.classes.index(int(self._y_data[index]))
 
     def __len__(self):
         return len(self._X_data)

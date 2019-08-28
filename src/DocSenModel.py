@@ -2,6 +2,8 @@ from enum import Enum
 import torch
 import numpy as np
 
+from src.GNN import GNN
+
 
 class DocSenModel(torch.nn.Module):
     class SentenceModel(Enum):
@@ -16,7 +18,7 @@ class DocSenModel(torch.nn.Module):
         FORWARD = 1
         FORWARD_BACKWARD = 2
 
-    def __init__(self, sentence_model: SentenceModel, gnn_output: GnnOutput, gnn_type: GnnType,
+    def __init__(self, output_size: int, sentence_model: SentenceModel, gnn_output: GnnOutput, gnn_type: GnnType,
                  embedding_matrix: np.array, freeze_embedding: bool = False):
         super(DocSenModel, self).__init__()
 
@@ -24,20 +26,29 @@ class DocSenModel(torch.nn.Module):
         self._gnn_output = gnn_output
         self._gnn_type = gnn_type
 
-        self._word_embedding_dim = len(embedding_matrix[0])
+        self._input_size = len(embedding_matrix[0])
+        self._hidden_size = 50
+        self._output_size = output_size
+
         self._vocab_size = len(embedding_matrix)
 
         self._word_embedding = torch.nn.Embedding.from_pretrained(torch.from_numpy(embedding_matrix), freeze=freeze_embedding)
 
         if self._sentence_model == self.SentenceModel.CONV:
-            self._conv1 = torch.nn.Conv1d(200, 50, 1, stride=1)
-            self._conv2 = torch.nn.Conv1d(200, 50, 2, stride=1)
-            self._conv3 = torch.nn.Conv1d(200, 50, 3, stride=1)
+            self._conv1 = torch.nn.Conv1d(self._input_size, self._hidden_size, 1, stride=1)
+            self._conv2 = torch.nn.Conv1d(self._input_size, self._hidden_size, 2, stride=1)
+            self._conv3 = torch.nn.Conv1d(self._input_size, self._hidden_size, 3, stride=1)
             self._conv = [self._conv1, self._conv2, self._conv3]
         else:
-            self._lstm = torch.nn.LSTM(200, 50, num_layers=1)
+            self._lstm = torch.nn.LSTM(self._input_size, self._hidden_size, num_layers=1)
 
         self._tanh = torch.nn.Tanh()
+
+        # Todo: GNN Forward-Backward option
+        self._gnn = GNN(self._hidden_size, self._hidden_size)
+
+        self._linear = torch.nn.Linear(self._hidden_size, self._output_size)
+        self._softmax = torch.nn.Softmax()
 
         self.double()
 
@@ -49,9 +60,12 @@ class DocSenModel(torch.nn.Module):
         """
 
         num_sentences = len(doc)
+        hidden_state = torch.zeros(1, self._hidden_size, requires_grad=True, dtype=torch.double)
+        hidden_states = None
         for i in range(0, num_sentences):
             # Turn vocabulary ids into embedding vectors
             sentence = self._word_embedding(torch.tensor(doc[i], dtype=torch.long))
+            sentence.requires_grad = True
             num_words = len(sentence)
 
             if num_words == 0:
@@ -66,11 +80,22 @@ class DocSenModel(torch.nn.Module):
             else:
                 sentence_rep = self._sentence_lstm(sentence)
 
-            # Todo: GRNN
+            # Model the document as GNN
+            hidden_state = self._gnn(sentence_rep, hidden_state)
 
-            X = sentence_rep
+            # Concatenate GNN output (=hidden_state) of all sentences -> Tensor of dim [num_sentences, hidden_size]
+            hidden_states = hidden_state if hidden_states is None else torch.cat((hidden_states, hidden_state))
 
-        return X
+        # Either take just the last output of the GNN chain or average all outputs
+        if self._gnn_type == self.GnnOutput.LAST:
+            gnn_out = hidden_state
+        else:
+            gnn_out = hidden_states.mean(0)
+
+        # Finally, compute the output as softmax of a linear mapping
+        output = self._softmax(self._linear(gnn_out))
+
+        return output
 
     def _sentence_convolution(self, num_words, sentence):
         # Rearrange shape for Conv1D layers
@@ -95,12 +120,15 @@ class DocSenModel(torch.nn.Module):
                 break
         # In the end merge the output of all applied pooling layers by averaging them
         sentence_rep = conv_result.mean(0)
-        return sentence_rep
+        return sentence_rep.t()
 
     def _sentence_lstm(self, sentence):
         sentence = sentence.permute(0, 2, 1)
-        initial_hidden_state = (torch.randn(1, 1, 50, dtype=torch.double),
-                                torch.randn(1, 1, 50, dtype=torch.double))
+        # Todo: init hidden state randomly or with zeros?
+        # initial_hidden_state = (torch.randn(1, 1, self._hidden_size, dtype=torch.double),
+        #                         torch.randn(1, 1, self._hidden_size, dtype=torch.double))
+        initial_hidden_state = (torch.zeros(1, 1, self._hidden_size, dtype=torch.double),
+                                torch.zeros(1, 1, self._hidden_size, dtype=torch.double))
         out, _ = self._lstm(sentence, initial_hidden_state)
 
         # LSTM output contains the whole state history for this sentence.

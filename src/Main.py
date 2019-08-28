@@ -25,7 +25,7 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
     train_sampler = sampler.SubsetRandomSampler(train_indices)
     valid_sampler = sampler.SubsetRandomSampler(val_indices)
 
-    loss_function = torch.nn.MSELoss()
+    loss_function = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     dataloader = ImdbDataloader(batch_size, train_sampler, dataset)
@@ -35,32 +35,31 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
         print(f'\nEpoch {epoch}')
 
         for batch_num, batch in enumerate(dataloader):
-            if batch_num % 10 == 0:
-                print(f'  Batch {batch_num+1} of {len(dataloader)}')
 
+
+            # Forward pass for each single document in the batch
+            predictions = None
+            labels = None
             for (doc, label) in batch:
-                label_predicted = model(doc)
+                prediction = model(doc)
+                prediction = prediction.unsqueeze(0)
+                predictions = prediction if predictions is None else torch.cat((predictions, prediction))
+                label = torch.Tensor([label])
+                label = label.long()
+                labels = label if labels is None else torch.cat((labels, label))
 
-            # compute the loss and store it; note that the loss is an object
-            # which we will also need to compute the gradient
-            # loss_object = loss_function(labels[i], label_predicted)
-            # learning_curve.append(loss_object.item())
-            #
-            # # print the loss every 50 steps so that we see the progress
-            # # while learning happens
-            # if len(learning_curve) % 50 == 0:
-            #     print('loss after {} steps: {}'.format(len(learning_curve), learning_curve[-1]))
-            #
-            # # A special feature of PyTorch is that we need to zero the gradients
-            # # in the optimizer to ensure that past computations do
-            # # not influence the present ones
-            # optimizer.zero_grad()
-            #
-            # # compute the gradient of the loss
-            # loss_object.backward()
-            #
-            # # compute a step of the optimizer based on the gradient
-            # optimizer.step()
+            # Compute the loss
+            loss_object = loss_function(predictions, labels)
+            learning_curve.append(loss_object.item())
+
+            if batch_num % 10 == 0:
+                print(f'  Batch {batch_num+1} of {len(dataloader)}. Loss: {learning_curve[-1]}')
+
+            # Reset the gradients in the optimizer.
+            # Otherwise past computations would influence new computations.
+            optimizer.zero_grad()
+            loss_object.backward()
+            optimizer.step()
 
 
 def main():
@@ -77,14 +76,16 @@ def main():
 
     dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac)
 
-    gnn_conv = DocSenModel(DocSenModel.SentenceModel.CONV,
-                           DocSenModel.GnnOutput.LAST,
+    gnn_conv = DocSenModel(dataset.num_classes,
+                           DocSenModel.SentenceModel.CONV,
+                           DocSenModel.GnnOutput.AVG,
                            DocSenModel.GnnType.FORWARD,
                            dataset.embedding,
                            freeze_embedding)
     train(batch_size, dataset, learning_rate, gnn_conv, num_epochs, random_seed, shuffle_dataset, validation_split)
 
-    gnn_lstm = DocSenModel(DocSenModel.SentenceModel.LSTM,
+    gnn_lstm = DocSenModel(dataset.num_classes,
+                           DocSenModel.SentenceModel.LSTM,
                            DocSenModel.GnnOutput.LAST,
                            DocSenModel.GnnType.FORWARD,
                            dataset.embedding,
