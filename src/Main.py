@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import torch
 from torch.utils.data import sampler
@@ -6,6 +8,8 @@ from src.DocSenModel import DocSenModel
 
 from src.ImdbDataloader import ImdbDataloader
 from src.ImdbDataset import ImdbDataset
+
+import matplotlib.pyplot as plt
 
 
 def split_data(dataset, random_seed, shuffle_dataset, validation_split):
@@ -32,11 +36,9 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
 
     learning_curve = []
     for epoch in range(num_epochs):
-        print(f'\nEpoch {epoch}')
+        print(f'\nEpoch {epoch} of {num_epochs}')
 
         for batch_num, batch in enumerate(dataloader):
-
-
             # Forward pass for each single document in the batch
             predictions = None
             labels = None
@@ -61,9 +63,11 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             loss_object.backward()
             optimizer.step()
 
+    return learning_curve
+
 
 def main():
-    num_epochs = 10
+    num_epochs = 70
     w2v_sample_frac = 0.9
     data_path = '../data/Dev/imdb-dev.txt.ss'
     data_name = 'imdb-dev'
@@ -76,21 +80,44 @@ def main():
 
     dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac)
 
-    gnn_conv = DocSenModel(dataset.num_classes,
-                           DocSenModel.SentenceModel.CONV,
-                           DocSenModel.GnnOutput.AVG,
-                           DocSenModel.GnnType.FORWARD,
-                           dataset.embedding,
-                           freeze_embedding)
-    train(batch_size, dataset, learning_rate, gnn_conv, num_epochs, random_seed, shuffle_dataset, validation_split)
+    model_path = '../models/gnn-conv-last-forward-imdb.pth'
+    if os.path.isfile(model_path):
+        model = torch.load(model_path)
+        model.eval()  # set to evaluation mode
+    else:
+        model = DocSenModel(dataset.num_classes,
+                               DocSenModel.SentenceModel.CONV,
+                               DocSenModel.GnnOutput.LAST,
+                               DocSenModel.GnnType.FORWARD,
+                               dataset.embedding,
+                               freeze_embedding)
+        learning_curve = train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split)
+        torch.save(model, model_path)
 
-    gnn_lstm = DocSenModel(dataset.num_classes,
-                           DocSenModel.SentenceModel.LSTM,
-                           DocSenModel.GnnOutput.LAST,
-                           DocSenModel.GnnType.FORWARD,
-                           dataset.embedding,
-                           freeze_embedding)
-    train(batch_size, dataset, learning_rate, gnn_lstm, num_epochs, random_seed, shuffle_dataset, validation_split)
+        fig = plt.figure()
+        plt.plot(range(len(learning_curve)), learning_curve)
+        plt.xlabel('Batch')
+        plt.ylabel('Cross-Entropy Loss')
+        fig.savefig(model_path + '.png', dpi=300, bbox_inches='tight')
+        plt.close(fig)
+
+    # model_path = '../models/gnn-lstm-last-forward-imdb.pth'
+    # if os.path.isfile(model_path):
+    #     model = torch.load(model_path)
+    #     model.eval()  # set to evaluation mode
+    # else:
+    #     model = DocSenModel(dataset.num_classes,
+    #                         DocSenModel.SentenceModel.LSTM,
+    #                         DocSenModel.GnnOutput.LAST,
+    #                         DocSenModel.GnnType.FORWARD,
+    #                         dataset.embedding,
+    #                         freeze_embedding)
+    #     learning_curve = train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset,
+    #                            validation_split)
+    #     torch.save(model, model_path)
+    #     plt.figure()
+    #     plt.plot(range(len(learning_curve)), learning_curve)
+    #     plt.show()
 
 
 if __name__ == '__main__':

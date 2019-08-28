@@ -3,3 +3,4 @@ gensim==3.8.0
 numpy==1.17.0
 keras>=2.2.4
 torch>=1.2.0
+matplotlib
