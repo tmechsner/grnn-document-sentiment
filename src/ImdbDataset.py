@@ -8,8 +8,8 @@ import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset
 
-from src.DocSenTypes import *
-from src.Word2Vector import Word2Vector
+from DocSenTypes import *
+from Word2Vector import Word2Vector
 
 
 class ImdbDataset(Dataset):

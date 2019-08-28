@@ -2,7 +2,7 @@ from enum import Enum
 import torch
 import numpy as np
 
-from src.GNN import GNN
+from GNN import GNN
 
 
 class DocSenModel(torch.nn.Module):

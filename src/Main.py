@@ -5,10 +5,10 @@ import numpy as np
 import torch
 from torch.utils.data import sampler
 
-from src.DocSenModel import DocSenModel
+from DocSenModel import DocSenModel
 
-from src.ImdbDataloader import ImdbDataloader
-from src.ImdbDataset import ImdbDataset
+from ImdbDataloader import ImdbDataloader
+from ImdbDataset import ImdbDataset
 
 import matplotlib.pyplot as plt
 
@@ -102,6 +102,8 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             model.train()
 
         print("Saving training progress checkpoint...")
+        if os.path.isfile(checkpoint_path):
+            os.rename(checkpoint_path, checkpoint_path + '_old')
         torch.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
@@ -110,7 +112,10 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             'valid_loss': valid_loss,
             'train_indices': train_indices,
             'val_indices': val_indices
-        }, checkpoint_path)
+        }, checkpoint_path + '_tmp')
+        os.rename(checkpoint_path + '_tmp', checkpoint_path)
+        if os.path.isfile(checkpoint_path + '_old'):
+            os.remove(checkpoint_path + '_old')
 
     return train_loss
 

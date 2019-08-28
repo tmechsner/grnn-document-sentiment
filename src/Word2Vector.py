@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import gensim as gs
 
-from src.DocSenTypes import *
+from DocSenTypes import *
 
 
 class Word2Vector:
