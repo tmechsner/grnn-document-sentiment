@@ -1,11 +1,11 @@
 import os
 import pickle
 import string
+import random
 from typing import Tuple, Dict, Union
 
 import gensim as gs
 import pandas as pd
-import numpy as np
 from torch.utils.data import Dataset
 
 from DocSenTypes import *
@@ -17,7 +17,8 @@ class ImdbDataset(Dataset):
     def __init__(self, data_paths: Union[str, List[str]], name: str, w2v_model_name: str = None,
                  overwrite: bool = False,
                  embedding_dim: int = 200, w2v_sample_frac: float = 0.3,
-                 w2v_path: str = "../data/Word2Vec/", prep_path: str = "../data/Preprocessed/"):
+                 w2v_path: str = "../data/Word2Vec/", prep_path: str = "../data/Preprocessed/",
+                 use_reduced_dataset: float=0):
         """
         Load a given IMDB rating dataset. If <overwrite> is true or there is no persisted data for the given <_name> yet,
         the data will be preprocessed and the results persisted under the given paths <w2v_path> and <prep_path>.
@@ -27,6 +28,8 @@ class ImdbDataset(Dataset):
         :param overwrite: If there are files with the given _name already, rebuild model and overwrite them or load them?
         :param w2v_path: Path to Word2Vec directory (for persistence)
         :param prep_path: Path to data preprocessing directory (for persistence)
+        :param use_reduced_dataset: If > 0, use only those data with class=min(classes) and class=max(classes) and
+        randomly sample a fraction of <use_reduced_dataset> of these data.
         """
         self._data_paths = data_paths
         self._prep_path = prep_path
@@ -39,12 +42,13 @@ class ImdbDataset(Dataset):
 
         self._embedding_dim = embedding_dim
         self._w2v_sample_frac = w2v_sample_frac
-        self._w2v = Word2Vector(data_paths, w2v_path, self._w2v_model_name, self._overwrite, self._embedding_dim, self._w2v_sample_frac)
+        self._w2v = Word2Vector(data_paths, w2v_path, self._w2v_model_name, self._overwrite, self._embedding_dim,
+                                self._w2v_sample_frac)
 
         self._imdb_rating_index = 2
         self._imdb_review_index = 3
 
-        self._X_data, self._y_data, self.embedding, self.word2index = self._load()
+        self._X_data, self._y_data, self.embedding, self.word2index = self._load(use_reduced_dataset)
         self.index2word = {index: word for (word, index) in self.word2index.items()}
         self.classes = sorted([int(y) for y in set(self._y_data)])
         self.num_classes = len(self.classes)
@@ -61,7 +65,7 @@ class ImdbDataset(Dataset):
     def __len__(self):
         return len(self._X_data)
 
-    def _load(self) -> Tuple[List[TDocumentInd], List[TRating], TEmbedding, Dict[TWord, TVocabIndex]]:
+    def _load(self, use_reduced_dataset) -> Tuple[List[TDocumentInd], List[TRating], TEmbedding, Dict[TWord, TVocabIndex]]:
         """
         Preprocess IMDB data: Extract text and rating data and replace words by vocabulary ids.
         :return: List of documents with vocabulary indices instead of words, list of ratings and word embedding matrix
@@ -75,6 +79,20 @@ class ImdbDataset(Dataset):
         else:
             print("Persisted data found. Loading...")
             X_data, y_data, embedding, word2index = self._load_preprocessed()
+
+        if use_reduced_dataset > 0:
+            classes = set(y_data)
+            class_min = min([int(y) for y in classes])
+            class_max = max([int(y) for y in classes])
+            X_reduced = []
+            y_reduced = []
+            for i, X in enumerate(X_data):
+                label = int(y_data[i])
+                if (label == class_min or label == class_max) and (random.uniform(0, 1) < use_reduced_dataset):
+                    X_reduced.append(X)
+                    y_reduced.append(y_data[i])
+            X_data = X_reduced
+            y_data = y_reduced
 
         return X_data, y_data, embedding, word2index
 

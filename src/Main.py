@@ -2,6 +2,7 @@ import os
 import random
 
 import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import sampler
 
@@ -24,7 +25,7 @@ def split_data(dataset, random_seed, shuffle_dataset, validation_split):
 
 
 def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split,
-          model_path, continue_training=True, validation_batches=80):
+          model_path, continue_training=True):
 
     loss_function = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -118,62 +119,99 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
         if os.path.isfile(checkpoint_path + '_old'):
             os.remove(checkpoint_path + '_old')
 
-    return train_loss
+
+def validate(dataset, model, model_path):
+
+    checkpoint_path = model_path + '_checkpoint.tar'
+    if not os.path.isfile(checkpoint_path):
+        print("Couldn't find the model checkpoint.")
+        return
+
+    checkpoint = torch.load(checkpoint_path)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    epoch = checkpoint['epoch']
+    train_loss = checkpoint['train_loss']
+    valid_loss = checkpoint['valid_loss']
+    train_indices = checkpoint['train_indices']
+    val_indices = checkpoint['val_indices']
+
+    valid_sampler = sampler.SubsetRandomSampler(val_indices)
+
+    print(f"Calculating accuracy of the model after {epoch} epochs of training...")
+
+    matches = 0
+    for k, i in enumerate(val_indices):
+        if k % 10 == 0:
+            print(f"Data sample {k+1} of {len(val_indices)}")
+        (doc, label) = dataset[i]
+        prediction = torch.argmax(model(doc))
+        label = torch.Tensor([label])
+        label = label.long()
+        if label == prediction:
+            matches += 1
+    accuracy = float(matches) / float(len(val_indices))
+    print(f"Accuracy: {accuracy}")
+
+
+def plot_loss_up_to_checkpoint(model_path, smoothing_window=300):
+    checkpoint_path = model_path + '_checkpoint.tar'
+    if os.path.isfile(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path)
+        epoch_0 = checkpoint['epoch'] + 1
+        train_loss = checkpoint['train_loss']
+        valid_loss = checkpoint['valid_loss']
+        fig = plt.figure()
+        plt.plot(range(len(train_loss)), pd.Series(train_loss).rolling(window=smoothing_window).mean().values,
+                 label='Training Loss')
+        plt.plot(range(len(valid_loss)), pd.Series(valid_loss).rolling(window=smoothing_window).mean().values,
+                 label='Validation Loss')
+        plt.legend()
+        plt.xlabel('Batch')
+        plt.ylabel('Cross-Entropy Loss')
+        plt.show()
+        plt.close(fig)
 
 
 def main():
-    num_epochs = 70
-    w2v_sample_frac = 0.9
-    data_path = '../data/Dev/imdb-dev.txt.ss'
-    data_name = 'imdb-dev'
-    freeze_embedding = True
-    batch_size = 16
-    validation_split = 0.2
-    shuffle_dataset = False
-    random_seed = 42
-    learning_rate = 0.03
-
-    dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac)
-
+    # Set model name for persistence here
     model_path = '../models/gnn-conv-last-forward-imdb'
-    if os.path.isfile(model_path):
-        model = torch.load(model_path)
-        model.eval()  # set to evaluation mode
+
+    # Specify what you want to do:
+    # Plot the loss up to the most recent checkpoint?
+    # Train the model?
+    # Or validate accuracy? (Both options = false)
+    plot_loss = False
+    train_model = True
+
+    if plot_loss:
+        plot_loss_up_to_checkpoint(model_path, smoothing_window=20)
+        quit()
     else:
+        num_epochs = 15
+        w2v_sample_frac = 0.9
+        data_path = '../data/Dev/imdb-dev.txt.ss'
+        data_name = 'imdb-dev'
+        freeze_embedding = True
+        batch_size = 50
+        validation_split = 0.2
+        shuffle_dataset = False
+        random_seed = 42
+        learning_rate = 0.015
+
+        dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac, use_reduced_dataset=0)
+
         model = DocSenModel(dataset.num_classes,
-                               DocSenModel.SentenceModel.CONV,
-                               DocSenModel.GnnOutput.LAST,
-                               DocSenModel.GnnType.FORWARD,
-                               dataset.embedding,
-                               freeze_embedding)
-        learning_curve = train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset,
-                               validation_split, model_path)
-        torch.save(model, model_path + '.pth')
+                            DocSenModel.SentenceModel.CONV,
+                            DocSenModel.GnnOutput.LAST,
+                            DocSenModel.GnnType.FORWARD,
+                            dataset.embedding,
+                            freeze_embedding)
 
-        fig = plt.figure()
-        plt.plot(range(len(learning_curve)), learning_curve)
-        plt.xlabel('Batch')
-        plt.ylabel('Cross-Entropy Loss')
-        fig.savefig(model_path + '.png', dpi=300, bbox_inches='tight')
-        plt.close(fig)
-
-    # model_path = '../models/gnn-lstm-last-forward-imdb.pth'
-    # if os.path.isfile(model_path):
-    #     model = torch.load(model_path)
-    #     model.eval()  # set to evaluation mode
-    # else:
-    #     model = DocSenModel(dataset.num_classes,
-    #                         DocSenModel.SentenceModel.LSTM,
-    #                         DocSenModel.GnnOutput.LAST,
-    #                         DocSenModel.GnnType.FORWARD,
-    #                         dataset.embedding,
-    #                         freeze_embedding)
-    #     learning_curve = train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset,
-    #                            validation_split)
-    #     torch.save(model, model_path)
-    #     plt.figure()
-    #     plt.plot(range(len(learning_curve)), learning_curve)
-    #     plt.show()
+        if train_model:
+            train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split,
+                  model_path)
+        else:
+            validate(dataset, model, model_path)
 
 
 if __name__ == '__main__':
