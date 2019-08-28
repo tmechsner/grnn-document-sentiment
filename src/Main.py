@@ -1,4 +1,5 @@
 import os
+import random
 
 import numpy as np
 import torch
@@ -22,23 +23,41 @@ def split_data(dataset, random_seed, shuffle_dataset, validation_split):
     return indices[split:], indices[:split]
 
 
-def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split):
-
-    train_indices, val_indices = split_data(dataset, random_seed, shuffle_dataset, validation_split)
-
-    train_sampler = sampler.SubsetRandomSampler(train_indices)
-    valid_sampler = sampler.SubsetRandomSampler(val_indices)
+def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split,
+          model_path, continue_training=True, validation_batches=80):
 
     loss_function = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    dataloader = ImdbDataloader(batch_size, train_sampler, dataset)
+    checkpoint_path = model_path + '_checkpoint.tar'
+    if continue_training and os.path.isfile(checkpoint_path):
+        print("Loading checkpoint to continue training...")
+        checkpoint = torch.load(checkpoint_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        epoch_0 = checkpoint['epoch'] + 1
+        train_loss = checkpoint['train_loss']
+        valid_loss = checkpoint['valid_loss']
+        train_indices = checkpoint['train_indices']
+        val_indices = checkpoint['val_indices']
+        print(f"Continue training in epoch {epoch_0+1}")
+    else:
+        print("Not loading a training checkpoint.")
+        train_loss = []
+        valid_loss = []
+        epoch_0 = 0
+        train_indices, val_indices = split_data(dataset, random_seed, shuffle_dataset, validation_split)
 
-    learning_curve = []
-    for epoch in range(num_epochs):
-        print(f'\nEpoch {epoch} of {num_epochs}')
+    train_sampler = sampler.SubsetRandomSampler(train_indices)
+    valid_sampler = sampler.SubsetRandomSampler(val_indices)
 
-        for batch_num, batch in enumerate(dataloader):
+    dataloader_train = ImdbDataloader(batch_size, train_sampler, dataset)
+    dataloader_valid = ImdbDataloader(batch_size, valid_sampler, dataset)
+
+    for epoch in range(epoch_0, num_epochs):
+        print(f'\nEpoch {epoch+1} of {num_epochs}')
+
+        for batch_num, batch in enumerate(dataloader_train):
             # Forward pass for each single document in the batch
             predictions = None
             labels = None
@@ -52,10 +71,10 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
 
             # Compute the loss
             loss_object = loss_function(predictions, labels)
-            learning_curve.append(loss_object.item())
+            train_loss.append(loss_object.item())
 
             if batch_num % 10 == 0:
-                print(f'  Batch {batch_num+1} of {len(dataloader)}. Loss: {learning_curve[-1]}')
+                print(f"  Batch {batch_num+1} of {len(dataloader_train)}. Loss: {train_loss[-1]}")
 
             # Reset the gradients in the optimizer.
             # Otherwise past computations would influence new computations.
@@ -63,7 +82,37 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             loss_object.backward()
             optimizer.step()
 
-    return learning_curve
+            # Test on a single batch from the validation set
+            # Set model to evaluation mode
+            model.eval()
+            batch_valid_indices = random.choices(val_indices, k=batch_size)
+            for (doc, label) in dataloader_valid._batch_iterator(batch_valid_indices):
+                prediction = model(doc)
+                prediction = prediction.unsqueeze(0)
+                predictions = prediction if predictions is None else torch.cat((predictions, prediction))
+                label = torch.Tensor([label])
+                label = label.long()
+                labels = label if labels is None else torch.cat((labels, label))
+
+            # Compute the loss
+            loss_object = loss_function(predictions, labels)
+            valid_loss.append(loss_object.item())
+
+            # Set model back to training mode
+            model.train()
+
+        print("Saving training progress checkpoint...")
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'train_loss': train_loss,
+            'valid_loss': valid_loss,
+            'train_indices': train_indices,
+            'val_indices': val_indices
+        }, checkpoint_path)
+
+    return train_loss
 
 
 def main():
@@ -80,7 +129,7 @@ def main():
 
     dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac)
 
-    model_path = '../models/gnn-conv-last-forward-imdb.pth'
+    model_path = '../models/gnn-conv-last-forward-imdb'
     if os.path.isfile(model_path):
         model = torch.load(model_path)
         model.eval()  # set to evaluation mode
@@ -91,8 +140,9 @@ def main():
                                DocSenModel.GnnType.FORWARD,
                                dataset.embedding,
                                freeze_embedding)
-        learning_curve = train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split)
-        torch.save(model, model_path)
+        learning_curve = train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset,
+                               validation_split, model_path)
+        torch.save(model, model_path + '.pth')
 
         fig = plt.figure()
         plt.plot(range(len(learning_curve)), learning_curve)
