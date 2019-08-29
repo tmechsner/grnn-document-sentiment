@@ -1,4 +1,5 @@
 import os
+import re
 import pickle
 import string
 import random
@@ -12,7 +13,7 @@ from DocSenTypes import *
 from Word2Vector import Word2Vector
 
 
-class ImdbDataset(Dataset):
+class YelpDataset(Dataset):
 
     def __init__(self, data_paths: Union[str, List[str]], name: str, w2v_model_name: str = None,
                  overwrite: bool = False,
@@ -20,7 +21,7 @@ class ImdbDataset(Dataset):
                  w2v_path: str = "../data/Word2Vec/", prep_path: str = "../data/Preprocessed/",
                  use_reduced_dataset: float=0):
         """
-        Load a given IMDB rating dataset. If <overwrite> is true or there is no persisted data for the given <_name> yet,
+        Load a given YELP rating dataset. If <overwrite> is true or there is no persisted data for the given <_name> yet,
         the data will be preprocessed and the results persisted under the given paths <w2v_path> and <prep_path>.
 
         :param data_paths: One or multiple paths to raw data files to load
@@ -42,11 +43,10 @@ class ImdbDataset(Dataset):
 
         self._embedding_dim = embedding_dim
         self._w2v_sample_frac = w2v_sample_frac
-        self._w2v = Word2Vector(data_paths, w2v_path, self._w2v_model_name, self._overwrite, self._embedding_dim,
-                                self._w2v_sample_frac)
+        self._w2v = Word2Vector(data_paths, w2v_path, self._w2v_model_name, self._overwrite, self._embedding_dim)
 
-        self._imdb_rating_index = 2
-        self._imdb_review_index = 3
+        self._yelp_rating_key = 'stars'
+        self._yelp_review_key = 'text'
 
         self._X_data, self._y_data, self.embedding, self.word2index = self._load(use_reduced_dataset)
         self.index2word = {index: word for (word, index) in self.word2index.items()}
@@ -109,27 +109,31 @@ class ImdbDataset(Dataset):
         data = pd.DataFrame()
         if type(self._data_paths) == List[str]:
             for path in self._data_paths:
-                data_in = pd.read_csv(path, sep="    ", header=None, engine='python', names=["full_review"])
+                data_in = pd.read_json(path, lines=True)
                 data = pd.concat([data, data_in], axis=0)
                 del data_in
         else:
-            data = pd.read_csv(self._data_paths, sep="    ", header=None, engine='python', names=["full_review"])
-        data["split"] = data['full_review'].str.split("\t\t")
+            data = pd.read_json(self._data_paths, lines=True)
         # y is a list of gold star ratings for reviews
-        y_data = [ls[self._imdb_rating_index] for ls in data["split"]]
+        y_data = data[self._yelp_rating_key]
         # X is a list with all documents, where documents are lists of sentences and each sentence-list
         # contains single words as strings
-        X_data_text = [ls[self._imdb_review_index] for ls in data["split"]]
+        X_data_text = data[self._yelp_review_key]
         # Separate and preprocess words in sentences
-        for ii, doc in enumerate(X_data_text):
-            X_data_text[ii] = doc.split("<sssss>")
-            for jj, sent in enumerate(X_data_text[ii]):
-                X_data_text[ii][jj] = sent.translate(str.maketrans('', '', string.punctuation))
-                X_data_text[ii][jj] = gs.utils.simple_preprocess(sent, min_len=1, max_len=20, deacc=True)
-        embedding, word2index = self._w2v.get_embedding(X_data_text)
-        X_data_index = self._words_to_vocab_index(X_data_text, word2index)
+        X_data_prep = []
+        for i, doc in enumerate(X_data_text):
+            if i % 1000 == 0:
+                print(f"Processing documents {i} - {i+999} of {len(X_data_text)}...")
+            X_data_prep.append([])
+            split = re.split('\!|\.|\?|\;|\:|\n', doc)
+            for sentence in split:
+                sentence = sentence.translate(str.maketrans('', '', string.punctuation))
+                X_data_prep[-1].append(gs.utils.simple_preprocess(sentence, min_len=1, max_len=20, deacc=True))
+        print("Building word2vec model...")
+        embedding, word2index = self._w2v.get_embedding(X_data_prep)
+        X_data_index = self._words_to_vocab_index(X_data_prep, word2index)
         with open(self._X_text_path(), "wb") as savefile:
-            pickle.dump(X_data_text, savefile)
+            pickle.dump(X_data_prep, savefile)
         with open(self._X_path(), "wb") as savefile:
             pickle.dump(X_data_index, savefile)
         with open(self._y_path(), "wb") as savefile:
@@ -168,7 +172,7 @@ class ImdbDataset(Dataset):
 
 
 if __name__ == '__main__':
-    p = ImdbDataset('data/Dev/imdb-dev.txt.ss', 'imdb-dev', w2v_sample_frac=0.9)
+    p = YelpDataset('data/Dev/imdb-dev.txt.ss', 'imdb-dev', w2v_sample_frac=0.9)
     print(p[0])
     print(' '.join(list(map(lambda index: p.index2word[index], p[0][0][0]))))
     pass

@@ -13,6 +13,8 @@ from ImdbDataset import ImdbDataset
 
 import matplotlib.pyplot as plt
 
+from YelpDataset import YelpDataset
+
 
 def split_data(dataset, random_seed, shuffle_dataset, validation_split):
     dataset_size = len(dataset)
@@ -176,7 +178,7 @@ def plot_loss_up_to_checkpoint(model_path, smoothing_window=300):
 
 def main():
     # Set model name for persistence here
-    model_path = '../models/gnn-conv-last-forward-imdb-word-linear-bs-50-lr-0.015'
+    model_path = '../models/gnn-conv-avg-forward-backward-yelp-word-linear-bs-50-lr-0.03'
 
     # Specify what you want to do:
     # Plot the loss up to the most recent checkpoint?
@@ -191,25 +193,27 @@ def main():
     else:
         num_epochs = 70
         w2v_sample_frac = 0.9
-        data_path = '../data/Dev/imdb-dev.txt.ss'
-        data_name = 'imdb-dev'
+        # data_path = '../data/Dev/imdb-dev.txt.ss'
+        data_path = '../data/Yelp/2013_witte/yelp_academic_dataset_review.json'
+        data_name = 'yelp'
         freeze_embedding = True
         batch_size = 50
         validation_split = 0.2
         shuffle_dataset = False
 
         random_seed = 3
-        learning_rate = 0.015
+        learning_rate = 0.03
 
         torch.manual_seed(random_seed)
         np.random.seed(random_seed)
 
-        dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac, use_reduced_dataset=0)
+        # dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac, use_reduced_dataset=0)
+        dataset = YelpDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac, use_reduced_dataset=0)
 
         model = DocSenModel(dataset.num_classes,
                             DocSenModel.SentenceModel.CONV,
-                            DocSenModel.GnnOutput.LAST,
-                            DocSenModel.GnnType.FORWARD,
+                            DocSenModel.GnnOutput.AVG,
+                            DocSenModel.GnnType.FORWARD_BACKWARD,
                             dataset.embedding,
                             freeze_embedding)
 
