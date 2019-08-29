@@ -87,7 +87,7 @@ class DocSenModel(torch.nn.Module):
             hidden_states = hidden_state if hidden_states is None else torch.cat((hidden_states, hidden_state))
 
         # Either take just the last output of the GNN chain or average all outputs
-        if self._gnn_type == self.GnnOutput.LAST:
+        if self._gnn_output == self.GnnOutput.LAST:
             gnn_out = hidden_state
         else:
             gnn_out = hidden_states.mean(0)

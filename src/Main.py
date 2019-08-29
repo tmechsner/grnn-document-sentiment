@@ -187,7 +187,7 @@ def main():
         plot_loss_up_to_checkpoint(model_path, smoothing_window=20)
         quit()
     else:
-        num_epochs = 15
+        num_epochs = 70
         w2v_sample_frac = 0.9
         data_path = '../data/Dev/imdb-dev.txt.ss'
         data_name = 'imdb-dev'
