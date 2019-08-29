@@ -28,7 +28,10 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
           model_path, continue_training=True):
 
     loss_function = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    # Todo: Which optimizer to use? In Paper: Simple SGD, no Momentum
+    # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
 
     checkpoint_path = model_path + '_checkpoint.tar'
     if continue_training and os.path.isfile(checkpoint_path):
@@ -157,7 +160,6 @@ def plot_loss_up_to_checkpoint(model_path, smoothing_window=300):
     checkpoint_path = model_path + '_checkpoint.tar'
     if os.path.isfile(checkpoint_path):
         checkpoint = torch.load(checkpoint_path)
-        epoch_0 = checkpoint['epoch'] + 1
         train_loss = checkpoint['train_loss']
         valid_loss = checkpoint['valid_loss']
         fig = plt.figure()
@@ -174,7 +176,7 @@ def plot_loss_up_to_checkpoint(model_path, smoothing_window=300):
 
 def main():
     # Set model name for persistence here
-    model_path = '../models/gnn-conv-last-forward-imdb'
+    model_path = '../models/gnn-conv-last-forward-imdb-word-linear-bs-50-lr-0.015'
 
     # Specify what you want to do:
     # Plot the loss up to the most recent checkpoint?
@@ -195,8 +197,12 @@ def main():
         batch_size = 50
         validation_split = 0.2
         shuffle_dataset = False
-        random_seed = 42
+
+        random_seed = 3
         learning_rate = 0.015
+
+        torch.manual_seed(random_seed)
+        np.random.seed(random_seed)
 
         dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac, use_reduced_dataset=0)
 

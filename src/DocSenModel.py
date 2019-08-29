@@ -34,10 +34,12 @@ class DocSenModel(torch.nn.Module):
 
         self._word_embedding = torch.nn.Embedding.from_pretrained(torch.from_numpy(embedding_matrix), freeze=freeze_embedding)
 
+        self._word_linear = torch.nn.Linear(self._input_size, self._hidden_size)
+
         if self._sentence_model == self.SentenceModel.CONV:
-            self._conv1 = torch.nn.Conv1d(self._input_size, self._hidden_size, 1, stride=1)
-            self._conv2 = torch.nn.Conv1d(self._input_size, self._hidden_size, 2, stride=1)
-            self._conv3 = torch.nn.Conv1d(self._input_size, self._hidden_size, 3, stride=1)
+            self._conv1 = torch.nn.Conv1d(self._hidden_size, self._hidden_size, 1, stride=1)
+            self._conv2 = torch.nn.Conv1d(self._hidden_size, self._hidden_size, 2, stride=1)
+            self._conv3 = torch.nn.Conv1d(self._hidden_size, self._hidden_size, 3, stride=1)
             self._conv = [self._conv1, self._conv2, self._conv3]
         else:
             self._lstm = torch.nn.LSTM(self._input_size, self._hidden_size, num_layers=1)
@@ -71,6 +73,14 @@ class DocSenModel(torch.nn.Module):
             if num_words == 0:
                 continue
 
+            sentence_new = None
+            for word in sentence:
+                out = self._word_linear(word)
+                out = out.unsqueeze(0)
+                sentence_new = out if sentence_new is None else torch.cat((sentence_new, out))
+
+            sentence = sentence_new
+
             # Add third dimension for number of sentences (here: always equal to one)
             sentence = sentence.unsqueeze(2)
 
@@ -88,7 +98,7 @@ class DocSenModel(torch.nn.Module):
 
         # Either take just the last output of the GNN chain or average all outputs
         if self._gnn_output == self.GnnOutput.LAST:
-            gnn_out = hidden_state
+            gnn_out = hidden_state.squeeze(0)
         else:
             gnn_out = hidden_states.mean(0)
 
