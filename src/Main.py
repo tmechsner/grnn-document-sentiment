@@ -186,7 +186,7 @@ def validate(dataset, model, model_path):
 
     valid_sampler = sampler.SubsetRandomSampler(val_indices)
 
-    print(f"Calculating accuracy of the model after {epoch} epochs of training...")
+    print(f"Calculating accuracy of the model after {epoch+1} epochs of training...")
 
     matches = 0
     diffs = []
@@ -207,9 +207,12 @@ def validate(dataset, model, model_path):
         processed_docs += 1
         diffs.append(int(np.abs(label - prediction)))
     accuracy = float(matches) / float(processed_docs)
-    mae = np.array(diffs).mean()
+    diffs = np.array(diffs)
+    mae = diffs.mean()
+    aev = diffs.var()
     print(f"Accuracy: {accuracy}")
     print(f"Mean Absolute Error: {mae}")
+    print(f"Absolute Error Variance: {aev}")
 
 
 def plot_loss_up_to_checkpoint(model_path, smoothing_window=300):
