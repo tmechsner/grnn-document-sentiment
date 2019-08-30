@@ -1,4 +1,5 @@
 import os
+from shutil import copyfile
 import random
 
 import numpy as np
@@ -179,8 +180,15 @@ def plot_loss_up_to_checkpoint(model_path, smoothing_window=300):
 
 
 def main():
+    if not os.path.exists('models'):
+        os.makedirs('models')
+
     # Set model name for persistence here
-    model_path = '/yelp/gnn-conv-avg-forward-backward-yelp-word-linear-bs-50-lr-0.03'
+    model_name = 'gnn-conv-avg-forward-backward-yelp-word-linear-bs-50-lr-0.03'
+    model_path = 'models/' + model_name
+    checkpoint_path = '/checkpoint/' + model_name + '_checkpoint.tar'
+    if os.path.isfile(checkpoint_path):
+        copyfile(checkpoint_path, model_path + '_checkpoint.tar')
 
     # Specify what you want to do:
     # Plot the loss up to the most recent checkpoint?
