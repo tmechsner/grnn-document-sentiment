@@ -51,6 +51,8 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
         epoch_0 = checkpoint['epoch'] + 1
         train_loss = checkpoint['train_loss']
         valid_loss = checkpoint['valid_loss']
+        train_acc = checkpoint['train_acc']
+        valid_acc = checkpoint['valid_acc']
         train_indices = checkpoint['train_indices']
         val_indices = checkpoint['val_indices']
         print(f"Continue training in epoch {epoch_0+1}")
@@ -58,6 +60,8 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
         print("Not loading a training checkpoint.")
         train_loss = []
         valid_loss = []
+        train_acc = []
+        valid_acc = []
         epoch_0 = 0
         train_indices, val_indices = split_data(dataset, random_seed, shuffle_dataset, validation_split)
 
@@ -81,6 +85,7 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             # Forward pass for each single document in the batch
             predictions = None
             labels = None
+            matches = 0
             for (doc, label) in batch:
                 if len(doc) == 0:
                     continue
@@ -91,6 +96,9 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
                     label = torch.Tensor([label])
                     label = label.long().to(model._device)
                     labels = label if labels is None else torch.cat((labels, label))
+
+                    if label == torch.argmax(prediction):
+                        matches += 1
                 except AttributeError as e:
                     print("Some error occurred. Ignoring this document. Error:")
                     print(e)
@@ -100,6 +108,9 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             loss_object = loss_function(predictions, labels)
             loss = loss_object.item()
             train_loss.append(loss)
+
+            accuracy = float(matches) / float(len(predictions))
+            train_acc.append(accuracy)
 
             if loss < min_loss:
                 min_loss = loss
@@ -115,6 +126,9 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             # Set model to evaluation mode
             model.eval()
             batch_valid_indices = random.choices(val_indices, k=batch_size)
+            predictions = None
+            labels = None
+            matches = 0
             for (doc, label) in dataloader_valid._batch_iterator(batch_valid_indices):
                 if len(doc) == 0:
                     continue
@@ -125,6 +139,9 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
                     label = torch.Tensor([label])
                     label = label.long().to(model._device)
                     labels = label if labels is None else torch.cat((labels, label))
+
+                    if label == torch.argmax(prediction):
+                        matches += 1
                 except AttributeError as e:
                     print("Some error occurred. Ignoring this document. Error:")
                     print(e)
@@ -134,12 +151,16 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             loss_object = loss_function(predictions, labels)
             valid_loss.append(loss_object.item())
 
+            accuracy = float(matches) / float(len(predictions))
+            valid_acc.append(accuracy)
+
             # Set model back to training mode
             model.train()
 
             if batch_num % 10 == 0:
-                print(f"  Batch {batch_num+1} of {len(dataloader_train)}. Training-Loss: {train_loss[-1]} \t"
-                      f" Validation-Loss: {valid_loss[-1]}")
+                print(f"  Batch {batch_num+1:>5} of {len(dataloader_train):>5}  -"
+                      f"   Training-Loss: {train_loss[-1]:.4f}   Validation-Loss: {valid_loss[-1]:.4f}"
+                      f"   Training-Acc.: {train_acc[-1]:.2f}   Validation-Acc.: {valid_acc[-1]:.2f}")
 
         print("Saving training progress checkpoint...")
         if os.path.isfile(checkpoint_path):
@@ -150,6 +171,8 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             'optimizer_state_dict': optimizer.state_dict(),
             'train_loss': train_loss,
             'valid_loss': valid_loss,
+            'train_acc': train_acc,
+            'valid_acc': valid_acc,
             'train_indices': train_indices,
             'val_indices': val_indices
         }, checkpoint_path + '_tmp')
@@ -195,16 +218,29 @@ def plot_loss_up_to_checkpoint(model_path, smoothing_window=300):
         checkpoint = torch.load(checkpoint_path)
         train_loss = checkpoint['train_loss']
         valid_loss = checkpoint['valid_loss']
-        fig = plt.figure()
-        plt.plot(range(len(train_loss)), pd.Series(train_loss).rolling(window=smoothing_window).mean().values,
-                 label='Training Loss')
-        plt.plot(range(len(valid_loss)), pd.Series(valid_loss).rolling(window=smoothing_window).mean().values,
-                 label='Validation Loss')
-        plt.legend()
+        train_acc = checkpoint['train_acc']
+        valid_acc = checkpoint['valid_acc']
+
+        f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+
+        # ax1.set_title('Loss')
+        ax1.set_ylabel('Cross-Entropy Loss')
+        ax1.plot(range(len(train_loss)), pd.Series(train_loss).rolling(window=smoothing_window).mean().values,
+                 label='Training')
+        ax1.plot(range(len(valid_loss)), pd.Series(valid_loss).rolling(window=smoothing_window).mean().values,
+                 label='Validation')
+
+        # ax2.set_title('Accuracy')
+        ax2.set_ylabel('Accuracy')
+        ax2.plot(range(len(train_acc)), pd.Series(train_acc).rolling(window=smoothing_window).mean().values,
+                 label='Training')
+        ax2.plot(range(len(valid_acc)), pd.Series(valid_acc).rolling(window=smoothing_window).mean().values,
+                 label='Validation')
+
         plt.xlabel('Batch')
-        plt.ylabel('Cross-Entropy Loss')
+        plt.legend()
         plt.show()
-        plt.close(fig)
+        plt.close(f)
 
 
 def main():
