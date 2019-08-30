@@ -68,6 +68,8 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             predictions = None
             labels = None
             for (doc, label) in batch:
+                if len(doc) == 0:
+                    continue
                 prediction = model(doc)
                 prediction = prediction.unsqueeze(0)
                 predictions = prediction if predictions is None else torch.cat((predictions, prediction))
