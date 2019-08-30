@@ -117,6 +117,10 @@ class DocSenModel(torch.nn.Module):
                 hidden_state_combined = torch.cat((hidden_states[-(i+1)].unsqueeze(0), hidden_state_b), dim=1)
                 hidden_states_combined = hidden_state_combined if hidden_states_combined is None else torch.cat((hidden_state_combined, hidden_states_combined))
 
+            if hidden_states_combined is None:
+                print("Hidden_states_combined is None!")
+                print("Shape of hidden_states: ", hidden_states.shape)
+                print("Len of sentence_reps: ", len(sentence_reps))
             gnn_out = hidden_states_combined.mean(0)
         else:
             # Either take just the last output of the GNN chain or average all outputs
