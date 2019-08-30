@@ -178,7 +178,7 @@ def plot_loss_up_to_checkpoint(model_path, smoothing_window=300):
 
 def main():
     # Set model name for persistence here
-    model_path = '../models/gnn-conv-avg-forward-backward-yelp-word-linear-bs-50-lr-0.03'
+    model_path = '/yelp/gnn-conv-avg-forward-backward-yelp-word-linear-bs-50-lr-0.03'
 
     # Specify what you want to do:
     # Plot the loss up to the most recent checkpoint?
@@ -194,7 +194,7 @@ def main():
         num_epochs = 70
         w2v_sample_frac = 0.9
         # data_path = '../data/Dev/imdb-dev.txt.ss'
-        data_path = '../data/Yelp/2013_witte/yelp_academic_dataset_review.json'
+        data_path = '/yelp/yelp_academic_dataset_review.json'
         data_name = 'yelp'
         freeze_embedding = True
         batch_size = 50
@@ -208,7 +208,8 @@ def main():
         np.random.seed(random_seed)
 
         # dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac, use_reduced_dataset=0)
-        dataset = YelpDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac, use_reduced_dataset=0)
+        dataset = YelpDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac, use_reduced_dataset=0,
+                              w2v_path="/yelp/", prep_path="/yelp/")
 
         model = DocSenModel(dataset.num_classes,
                             DocSenModel.SentenceModel.CONV,
