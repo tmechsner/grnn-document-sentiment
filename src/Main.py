@@ -8,11 +8,11 @@ from torch.utils.data import sampler
 
 from DocSenModel import DocSenModel
 
-from ImdbDataloader import ImdbDataloader
-from ImdbDataset import ImdbDataset
+from CustomDataloader import CustomDataloader
 
 import matplotlib.pyplot as plt
 
+from ImdbDataset import ImdbDataset
 from YelpDataset import YelpDataset
 
 
@@ -57,8 +57,8 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
     train_sampler = sampler.SubsetRandomSampler(train_indices)
     valid_sampler = sampler.SubsetRandomSampler(val_indices)
 
-    dataloader_train = ImdbDataloader(batch_size, train_sampler, dataset)
-    dataloader_valid = ImdbDataloader(batch_size, valid_sampler, dataset)
+    dataloader_train = CustomDataloader(batch_size, train_sampler, dataset)
+    dataloader_valid = CustomDataloader(batch_size, valid_sampler, dataset)
 
     for epoch in range(epoch_0, num_epochs):
         print(f'\nEpoch {epoch+1} of {num_epochs}')
@@ -209,6 +209,7 @@ def main():
         batch_size = 50
         validation_split = 0.2
         shuffle_dataset = False
+        cuda = False
 
         random_seed = 3
         learning_rate = 0.03
@@ -224,7 +225,8 @@ def main():
                             DocSenModel.GnnOutput.AVG,
                             DocSenModel.GnnType.FORWARD_BACKWARD,
                             dataset.embedding,
-                            freeze_embedding)
+                            freeze_embedding,
+                            cuda=cuda)
 
         if train_model:
             train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split,
