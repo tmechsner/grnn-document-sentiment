@@ -93,12 +93,19 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             model.eval()
             batch_valid_indices = random.choices(val_indices, k=batch_size)
             for (doc, label) in dataloader_valid._batch_iterator(batch_valid_indices):
-                prediction = model(doc)
-                prediction = prediction.unsqueeze(0)
-                predictions = prediction if predictions is None else torch.cat((predictions, prediction))
-                label = torch.Tensor([label])
-                label = label.long()
-                labels = label if labels is None else torch.cat((labels, label))
+                if len(doc) == 0:
+                    continue
+                try:
+                    prediction = model(doc)
+                    prediction = prediction.unsqueeze(0)
+                    predictions = prediction if predictions is None else torch.cat((predictions, prediction))
+                    label = torch.Tensor([label])
+                    label = label.long()
+                    labels = label if labels is None else torch.cat((labels, label))
+                except AttributeError as e:
+                    print("Some error occurred. Ignoring this document. Error:")
+                    print(e)
+                    continue
 
             # Compute the loss
             loss_object = loss_function(predictions, labels)

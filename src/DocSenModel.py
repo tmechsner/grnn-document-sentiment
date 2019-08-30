@@ -19,7 +19,7 @@ class DocSenModel(torch.nn.Module):
         FORWARD_BACKWARD = 2
 
     def __init__(self, output_size: int, sentence_model: SentenceModel, gnn_output: GnnOutput, gnn_type: GnnType,
-                 embedding_matrix: np.array, freeze_embedding: bool = False):
+                 embedding_matrix: np.array, freeze_embedding: bool = False, cuda: bool = False):
         super(DocSenModel, self).__init__()
 
         self._sentence_model = sentence_model
@@ -62,6 +62,13 @@ class DocSenModel(torch.nn.Module):
 
         self.double()
 
+        self._cuda = cuda
+        if self._cuda:
+            self._device = torch.device('cuda')
+            self.cuda(self._device)
+        else:
+            self._device = torch.device('cpu')
+
     def forward(self, doc):
         """
         Process a single document
@@ -70,12 +77,13 @@ class DocSenModel(torch.nn.Module):
         """
 
         num_sentences = len(doc)
-        hidden_state = torch.zeros(1, self._hidden_size, requires_grad=True, dtype=torch.double)
+        hidden_state = torch.zeros(1, self._hidden_size, requires_grad=True, dtype=torch.double, device=self._device)
         hidden_states = None
         sentence_reps = []
         for i in range(0, num_sentences):
             # Turn vocabulary ids into embedding vectors
-            sentence = self._word_embedding(torch.tensor(doc[i], dtype=torch.long))
+            sentence: torch.Tensor = self._word_embedding(torch.tensor(doc[i], dtype=torch.long, device=self._device))
+            sentence = sentence.to(self._device)
             sentence.requires_grad = True
             num_words = len(sentence)
 
@@ -110,17 +118,13 @@ class DocSenModel(torch.nn.Module):
 
         # Do backward processing too if required
         if self._gnn_type == self.GnnType.FORWARD_BACKWARD:
-            hidden_state_b = torch.zeros(1, self._hidden_size, requires_grad=True, dtype=torch.double)
+            hidden_state_b = torch.zeros(1, self._hidden_size, requires_grad=True, dtype=torch.double, device=self._device)
             hidden_states_combined = None
             for i, sentence_rep in enumerate(reversed(sentence_reps)):
                 hidden_state_b = self._gnn_b(sentence_rep, hidden_state_b)
                 hidden_state_combined = torch.cat((hidden_states[-(i+1)].unsqueeze(0), hidden_state_b), dim=1)
                 hidden_states_combined = hidden_state_combined if hidden_states_combined is None else torch.cat((hidden_state_combined, hidden_states_combined))
 
-            if hidden_states_combined is None:
-                print("Hidden_states_combined is None!")
-                print("Shape of hidden_states: ", hidden_states.shape)
-                print("Len of sentence_reps: ", len(sentence_reps))
             gnn_out = hidden_states_combined.mean(0)
         else:
             # Either take just the last output of the GNN chain or average all outputs
@@ -164,8 +168,8 @@ class DocSenModel(torch.nn.Module):
         # Todo: init hidden state randomly or with zeros?
         # initial_hidden_state = (torch.randn(1, 1, self._hidden_size, dtype=torch.double),
         #                         torch.randn(1, 1, self._hidden_size, dtype=torch.double))
-        initial_hidden_state = (torch.zeros(1, 1, self._hidden_size, dtype=torch.double),
-                                torch.zeros(1, 1, self._hidden_size, dtype=torch.double))
+        initial_hidden_state = (torch.zeros(1, 1, self._hidden_size, dtype=torch.double, device=self._device),
+                                torch.zeros(1, 1, self._hidden_size, dtype=torch.double, device=self._device))
         out, _ = self._lstm(sentence, initial_hidden_state)
 
         # LSTM output contains the whole state history for this sentence.
