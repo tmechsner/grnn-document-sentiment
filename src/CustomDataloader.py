@@ -2,7 +2,7 @@ from torch.utils.data import sampler, Dataset
 from typing import List
 
 
-class ImdbDataloader:
+class CustomDataloader:
     """
     On iteration it yields batches with desired batch size, generated using the given sampler.
     These batches can then again be iterated to receive tuples of document and label.
