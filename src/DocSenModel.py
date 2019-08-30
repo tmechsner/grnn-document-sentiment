@@ -111,13 +111,13 @@ class DocSenModel(torch.nn.Module):
         # Do backward processing too if required
         if self._gnn_type == self.GnnType.FORWARD_BACKWARD:
             hidden_state_b = torch.zeros(1, self._hidden_size, requires_grad=True, dtype=torch.double)
-            hidden_states_b = None
-            for sentence_rep in reversed(sentence_reps):
+            hidden_states_combined = None
+            for i, sentence_rep in enumerate(reversed(sentence_reps)):
                 hidden_state_b = self._gnn_b(sentence_rep, hidden_state_b)
-                hidden_states_b = hidden_state_b if hidden_states_b is None else torch.cat((hidden_states_b, hidden_state_b))
+                hidden_state_combined = torch.cat((hidden_states[-(i+1)].unsqueeze(0), hidden_state_b), dim=1)
+                hidden_states_combined = hidden_state_combined if hidden_states_combined is None else torch.cat((hidden_state_combined, hidden_states_combined))
 
-            hidden_combined = torch.cat((hidden_states, hidden_states_b), dim=1)
-            gnn_out = hidden_combined.mean(0)
+            gnn_out = hidden_states_combined.mean(0)
         else:
             # Either take just the last output of the GNN chain or average all outputs
             if self._gnn_output == self.GnnOutput.LAST:
