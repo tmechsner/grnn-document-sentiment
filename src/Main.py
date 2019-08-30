@@ -1,3 +1,9 @@
+# From within /src call:
+# floyd run --env pytorch-1.0 --data deratomkeks/datasets/yelp-2013-academic/2:yelp --data deratomkeks/projects/grnn-document-sentiment/15:/checkpoint "python3 Main.py"
+# where 15 here is the number of the run to continue.
+# Run the following to start a new training:
+# floyd run --env pytorch-1.0 --data deratomkeks/datasets/yelp-2013-academic/2:yelp "python3 Main.py"
+
 import os
 from shutil import copyfile
 import random
@@ -193,7 +199,7 @@ def main():
     # Set model name for persistence here
     model_name = 'gnn-conv-avg-forward-backward-yelp-word-linear-bs-50-lr-0.03'
     model_path = 'models/' + model_name
-    checkpoint_path = '/checkpoint/' + model_name + '_checkpoint.tar'
+    checkpoint_path = '/checkpoint/models/' + model_name + '_checkpoint.tar'
     if os.path.isfile(checkpoint_path):
         copyfile(checkpoint_path, model_path + '_checkpoint.tar')
 
