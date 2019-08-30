@@ -81,7 +81,7 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
                 prediction = prediction.unsqueeze(0)
                 predictions = prediction if predictions is None else torch.cat((predictions, prediction))
                 label = torch.Tensor([label])
-                label = label.long()
+                label = label.long().to(model._device)
                 labels = label if labels is None else torch.cat((labels, label))
 
             # Compute the loss
@@ -111,7 +111,7 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
                     prediction = prediction.unsqueeze(0)
                     predictions = prediction if predictions is None else torch.cat((predictions, prediction))
                     label = torch.Tensor([label])
-                    label = label.long()
+                    label = label.long().to(model._device)
                     labels = label if labels is None else torch.cat((labels, label))
                 except AttributeError as e:
                     print("Some error occurred. Ignoring this document. Error:")
