@@ -34,7 +34,7 @@ def split_data(dataset, random_seed, shuffle_dataset, validation_split):
 
 
 def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split,
-          model_path, continue_training=True):
+          model_path, continue_training=True, early_stopping=2):
 
     loss_function = torch.nn.CrossEntropyLoss()
 
@@ -67,8 +67,15 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
     dataloader_train = CustomDataloader(batch_size, train_sampler, dataset)
     dataloader_valid = CustomDataloader(batch_size, valid_sampler, dataset)
 
+    min_loss = 99999
+    min_loss_epoch = 0
     for epoch in range(epoch_0, num_epochs):
         print(f'\nEpoch {epoch+1} of {num_epochs}')
+
+        if early_stopping > 0:
+            if epoch - min_loss_epoch >= early_stopping:
+                print(f"No training improvement over the last {early_stopping} epochs. Aborting.")
+                break
 
         for batch_num, batch in enumerate(dataloader_train):
             # Forward pass for each single document in the batch
@@ -86,7 +93,12 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
 
             # Compute the loss
             loss_object = loss_function(predictions, labels)
-            train_loss.append(loss_object.item())
+            loss = loss_object.item()
+            train_loss.append(loss)
+
+            if loss < min_loss:
+                min_loss = loss
+                min_loss_epoch = epoch
 
             # Reset the gradients in the optimizer.
             # Otherwise past computations would influence new computations.
