@@ -182,9 +182,6 @@ def validate(dataset, model, model_path):
     checkpoint = torch.load(checkpoint_path)
     model.load_state_dict(checkpoint['model_state_dict'])
     epoch = checkpoint['epoch']
-    train_loss = checkpoint['train_loss']
-    valid_loss = checkpoint['valid_loss']
-    train_indices = checkpoint['train_indices']
     val_indices = checkpoint['val_indices']
 
     valid_sampler = sampler.SubsetRandomSampler(val_indices)
@@ -192,17 +189,27 @@ def validate(dataset, model, model_path):
     print(f"Calculating accuracy of the model after {epoch} epochs of training...")
 
     matches = 0
+    diffs = []
+    processed_docs = 0
     for k, i in enumerate(val_indices):
         if k % 10 == 0:
             print(f"Data sample {k+1} of {len(val_indices)}")
         (doc, label) = dataset[i]
-        prediction = torch.argmax(model(doc))
+        try:
+            prediction = torch.argmax(model(doc))
+        except AttributeError as e:
+            print("Something went wrong. Ignoring this document.")
+            continue
         label = torch.Tensor([label])
         label = label.long()
         if label == prediction:
             matches += 1
-    accuracy = float(matches) / float(len(val_indices))
+        processed_docs += 1
+        diffs.append(int(np.abs(label - prediction)))
+    accuracy = float(matches) / float(processed_docs)
+    mae = np.array(diffs).mean()
     print(f"Accuracy: {accuracy}")
+    print(f"Mean Absolute Error: {mae}")
 
 
 def plot_loss_up_to_checkpoint(model_path, smoothing_window=300):
@@ -245,10 +252,10 @@ def main():
     # Train the model?
     # Or validate accuracy? (Both options = false)
     plot_loss = False
-    train_model = True
+    train_model = False
 
     if plot_loss:
-        plot_loss_up_to_checkpoint(model_path, smoothing_window=20)
+        plot_loss_up_to_checkpoint(model_path, smoothing_window=50)
         quit()
     else:
         num_epochs = 70
