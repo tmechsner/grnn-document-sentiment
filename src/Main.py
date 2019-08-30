@@ -131,7 +131,7 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
 
         print("Saving training progress checkpoint...")
         if os.path.isfile(checkpoint_path):
-            os.rename(checkpoint_path, checkpoint_path + '_old')
+            os.rename(checkpoint_path, checkpoint_path + '_' + str(epoch))
         torch.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
@@ -142,8 +142,6 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             'val_indices': val_indices
         }, checkpoint_path + '_tmp')
         os.rename(checkpoint_path + '_tmp', checkpoint_path)
-        if os.path.isfile(checkpoint_path + '_old'):
-            os.remove(checkpoint_path + '_old')
 
 
 def validate(dataset, model, model_path):
