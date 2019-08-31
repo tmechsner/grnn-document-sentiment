@@ -258,13 +258,6 @@ def main():
     if not os.path.exists('models'):
         os.makedirs('models')
 
-    # Set model name for persistence here
-    model_name = 'gnn-conv-avg-forward-backward-yelp-word-linear-bs-50-lr-0.03'
-    model_path = 'models/' + model_name
-    checkpoint_path = '/checkpoint/models/' + model_name + '_checkpoint.tar'
-    if os.path.isfile(checkpoint_path):
-        copyfile(checkpoint_path, model_path + '_checkpoint.tar')
-
     num_epochs = 70
     w2v_sample_frac = 0.9
     # data_path = '../data/Dev/imdb-dev.txt.ss'
@@ -298,7 +291,6 @@ def main():
     parser.add_argument('-m', '--reduced-dataset', help="For testing purposes. Needs to be between 0 and 1."
                                                         " If > 0, use only two classes and a fraction of"
                                                         " <reduced-dataset> of the data.", action='store_true', default=0)
-
     # Model architecture
     parser.add_argument('--sentence-model', help="0=convolution, 1=lstm)", type=int, default=0)
     parser.add_argument('--gnn-output', help="0=last, 1=avg)", type=int, default=0)
@@ -306,8 +298,12 @@ def main():
 
     args = parser.parse_args()
 
+    # Set model name for persistence here
+    model_name = 'gnn-yelp'
+
     if args.retrain_embedding:
         print("Retraining the word embedding.")
+        model_name += '-retrain-embedding'
         freeze_embedding = False
     else:
         print("Freezing the word embedding.")
@@ -315,24 +311,36 @@ def main():
 
     if args.sentence_model == 0:
         print("Sentence model: convolution")
+        model_name += '-conv'
         sentence_model = DocSenModel.SentenceModel.CONV
     else:
         print("Sentence model: LSTM")
+        model_name += '-lstm'
         sentence_model = DocSenModel.SentenceModel.LSTM
-
-    if args.gnn_output == 0:
-        print("GNN output: last")
-        gnn_output = DocSenModel.GnnOutput.LAST
-    else:
-        print("GNN output: avg")
-        gnn_output = DocSenModel.GnnOutput.AVG
 
     if args.gnn_type == 0:
         print("GNN type: forward")
+        model_name += '-forward'
         gnn_type = DocSenModel.GnnType.FORWARD
     else:
         print("GNN type: forward-backward")
+        model_name += '-forward-backward'
         gnn_type = DocSenModel.GnnType.FORWARD_BACKWARD
+
+    if args.gnn_output == 0:
+        print("GNN output: last")
+        model_name += '-last'
+        gnn_output = DocSenModel.GnnOutput.LAST
+    else:
+        print("GNN output: avg")
+        model_name += '-avg'
+        gnn_output = DocSenModel.GnnOutput.AVG
+
+    model_name += f"-bs{args.batch_size}-epochs{args.num_epochs}-lr{args.learning_rate}"
+    model_path = 'models/' + model_name
+    checkpoint_path = '/checkpoint/models/' + model_name + '_checkpoint.tar'
+    if os.path.isfile(checkpoint_path):
+        copyfile(checkpoint_path, model_path + '_checkpoint.tar')
 
     if args.action == 1:
         plot_loss_up_to_checkpoint(model_path, smoothing_window=400)
@@ -353,6 +361,7 @@ def main():
         print(f"Batch size: {args.batch_size}")
         print(f"Number of epochs: {args.num_epochs}")
         print(f"Learning rate: {args.learning_rate}")
+
         if args.cuda:
             print("Using cuda")
         else:
