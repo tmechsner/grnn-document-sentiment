@@ -45,7 +45,7 @@ class DocSenModel(torch.nn.Module):
             self._conv3 = torch.nn.Conv1d(self._hidden_size, self._hidden_size, 3, stride=1)
             self._conv = [self._conv1, self._conv2, self._conv3]
         else:
-            self._lstm = torch.nn.LSTM(self._input_size, self._hidden_size, num_layers=1)
+            self._lstm = torch.nn.LSTM(self._hidden_size, self._hidden_size, num_layers=1)
 
         self._tanh = torch.nn.Tanh()
 
