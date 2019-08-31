@@ -1,11 +1,4 @@
-# From within /src call:
-# floyd run --env pytorch-1.0 --data deratomkeks/datasets/yelp-2013-academic/2:yelp --data deratomkeks/projects/grnn-document-sentiment/15:/checkpoint "python3 Main.py"
-# where 15 here is the number of the run to continue.
-# Run the following to start a new training:
-# floyd run --env pytorch-1.0 --data deratomkeks/datasets/yelp-2013-academic/2:yelp "python3 Main.py"
-
 import os
-from shutil import copyfile
 import random
 import argparse
 
@@ -255,13 +248,10 @@ def plot_loss_up_to_checkpoint(model_path, smoothing_window=300):
 
 
 def main():
-    if not os.path.exists('models'):
-        os.makedirs('models')
-
     num_epochs = 70
     w2v_sample_frac = 0.9
     # data_path = '../data/Dev/imdb-dev.txt.ss'
-    data_path = '/yelp/yelp_academic_dataset_review.json'
+    data_path = '../data/Yelp/2013_witte/yelp_academic_dataset_review.json'
     data_name = 'yelp'
     freeze_embedding = True
     batch_size = 50
@@ -337,10 +327,8 @@ def main():
         gnn_output = DocSenModel.GnnOutput.AVG
 
     model_name += f"-bs{args.batch_size}-epochs{args.num_epochs}-lr{args.learning_rate}"
-    model_path = 'models/' + model_name
-    checkpoint_path = '/checkpoint/models/' + model_name + '_checkpoint.tar'
-    if os.path.isfile(checkpoint_path):
-        copyfile(checkpoint_path, model_path + '_checkpoint.tar')
+    model_path = '../models/' + model_name
+    # model_path = '../models/gnn-conv-avg-forward-backward-yelp-word-linear-bs-50-lr-0.03'
 
     if args.action == 1:
         plot_loss_up_to_checkpoint(model_path, smoothing_window=400)
@@ -354,8 +342,7 @@ def main():
         print(f"Reduced dataset: {args.reduced_dataset}")
 
         # dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac, use_reduced_dataset=0)
-        dataset = YelpDataset(args.data_path, args.data_name, w2v_sample_frac=w2v_sample_frac, use_reduced_dataset=args.reduced_dataset,
-                              w2v_path="/yelp/", prep_path="/yelp/")
+        dataset = YelpDataset(args.data_path, args.data_name, w2v_sample_frac=w2v_sample_frac, use_reduced_dataset=args.reduced_dataset)
 
         print(f"Number of classes: {dataset.num_classes}")
         print(f"Batch size: {args.batch_size}")
