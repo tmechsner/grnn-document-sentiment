@@ -66,7 +66,7 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
     dataloader_valid = CustomDataloader(batch_size, valid_sampler, dataset)
 
     min_loss = 99999
-    min_loss_epoch = 0
+    min_loss_epoch = epoch_0
     for epoch in range(epoch_0, num_epochs):
         print(f'\nEpoch {epoch+1} of {num_epochs}')
 
