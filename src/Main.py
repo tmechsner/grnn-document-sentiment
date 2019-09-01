@@ -263,11 +263,13 @@ def main():
     learning_rate = 0.03
 
     action = 0
+    plot_smoothing = 50
 
     parser = argparse.ArgumentParser(description="GRNN-Document-Sentiment Model")
 
     # Actions
     parser.add_argument('-a', '--action', help="Action to be executed (0=train, 1=plot, 2=evaluate)", type=int, default=action)
+    parser.add_argument('-s', '--plot-smoothing', help="Window size of moving average smoothing", type=int, default=plot_smoothing)
 
     # Params
     parser.add_argument('-r', '--random-seed', type=int, default=random_seed)
@@ -328,10 +330,9 @@ def main():
 
     model_name += f"-bs{args.batch_size}-epochs{args.num_epochs}-lr{args.learning_rate}"
     model_path = '../models/' + model_name
-    # model_path = '../models/gnn-conv-avg-forward-backward-yelp-word-linear-bs-50-lr-0.03'
 
     if args.action == 1:
-        plot_loss_up_to_checkpoint(model_path, smoothing_window=400)
+        plot_loss_up_to_checkpoint(model_path, smoothing_window=args.plot_smoothing)
         quit()
     else:
         torch.manual_seed(args.random_seed)
