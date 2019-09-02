@@ -1,11 +1,12 @@
 import os
-import re
 import pickle
-import string
 import random
+import re
+import string
 from typing import Tuple, Dict, Union
 
 import gensim as gs
+import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
 
@@ -19,7 +20,7 @@ class YelpDataset(Dataset):
                  overwrite: bool = False,
                  embedding_dim: int = 200, w2v_sample_frac: float = 0.3,
                  w2v_path: str = "../data/Word2Vec/", prep_path: str = "../data/Preprocessed/",
-                 use_reduced_dataset: float=0):
+                 use_reduced_dataset: float = 0):
         """
         Load a given YELP rating dataset. If <overwrite> is true or there is no persisted data for the given <_name> yet,
         the data will be preprocessed and the results persisted under the given paths <w2v_path> and <prep_path>.
@@ -51,10 +52,18 @@ class YelpDataset(Dataset):
         self._X_data, self._y_data, self.embedding, self.word2index = self._load(use_reduced_dataset)
         self.index2word = {index: word for (word, index) in self.word2index.items()}
         self.classes = sorted([int(y) for y in set(self._y_data)])
+
         self.num_classes = len(self.classes)
 
         self.unknown_word_key = self._w2v.unknown_word_key
         self.padding_word_key = self._w2v.padding_word_key
+
+    def get_class_distr(self, labels):
+        class_distr = np.zeros((len(self.classes),))
+        for y in labels:
+            y = int(y)
+            class_distr[y - 1] += 1
+        return class_distr
 
     def __getitem__(self, index):
         """
@@ -65,7 +74,8 @@ class YelpDataset(Dataset):
     def __len__(self):
         return len(self._X_data)
 
-    def _load(self, use_reduced_dataset) -> Tuple[List[TDocumentInd], List[TRating], TEmbedding, Dict[TWord, TVocabIndex]]:
+    def _load(self, use_reduced_dataset) -> Tuple[
+        List[TDocumentInd], List[TRating], TEmbedding, Dict[TWord, TVocabIndex]]:
         """
         Preprocess IMDB data: Extract text and rating data and replace words by vocabulary ids.
         :return: List of documents with vocabulary indices instead of words, list of ratings and word embedding matrix
