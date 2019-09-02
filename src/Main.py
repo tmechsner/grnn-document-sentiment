@@ -1,4 +1,11 @@
+# From within /src call:
+# floyd run --env pytorch-1.0 --data deratomkeks/datasets/yelp-2013-academic/2:yelp --data deratomkeks/projects/grnn-document-sentiment/15:/checkpoint "python3 Main.py"
+# where 15 here is the number of the run to continue.
+# Run the following to start a new training:
+# floyd run --env pytorch-1.0 --data deratomkeks/datasets/yelp-2013-academic/2:yelp "python3 Main.py"
+
 import os
+from shutil import copyfile
 import random
 import argparse
 
@@ -27,7 +34,7 @@ def split_data(dataset, random_seed, shuffle_dataset, validation_split):
     return indices[split:], indices[:split]
 
 
-def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split,
+def train(batch_size, dataset, learning_rate, lr_decay_factor, model, num_epochs, random_seed, shuffle_dataset, validation_split,
           model_path, continue_training=True, early_stopping=2):
 
     loss_function = torch.nn.CrossEntropyLoss()
@@ -49,6 +56,11 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
         valid_acc = checkpoint['valid_acc']
         train_indices = checkpoint['train_indices']
         val_indices = checkpoint['val_indices']
+        try:
+            learning_rate = checkpoint['learning_rate']
+            lr_decay_factor = checkpoint['lr_decay_factor']
+        except Exception:
+            pass
         print(f"Continue training in epoch {epoch_0+1}")
     else:
         print("Not loading a training checkpoint.")
@@ -74,6 +86,8 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             if epoch - min_loss_epoch >= early_stopping:
                 print(f"No training improvement over the last {early_stopping} epochs. Aborting.")
                 break
+
+        learning_rate = lr_decay_factor * learning_rate
 
         for batch_num, batch in enumerate(dataloader_train):
             # Forward pass for each single document in the batch
@@ -168,7 +182,9 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             'train_acc': train_acc,
             'valid_acc': valid_acc,
             'train_indices': train_indices,
-            'val_indices': val_indices
+            'val_indices': val_indices,
+            'learning_rate': learning_rate,
+            'lr_decay_factor': lr_decay_factor
         }, checkpoint_path + '_tmp')
         os.rename(checkpoint_path + '_tmp', checkpoint_path)
 
@@ -250,17 +266,16 @@ def plot_loss_up_to_checkpoint(model_path, smoothing_window=300):
 def main():
     num_epochs = 70
     w2v_sample_frac = 0.9
-    # data_path = '../data/Dev/imdb-dev.txt.ss'
-    data_path = '../data/Yelp/2013_witte/yelp_academic_dataset_review.json'
-    data_name = 'yelp'
     freeze_embedding = True
     batch_size = 50
     validation_split = 0.2
     shuffle_dataset = False
     cuda = False
+    data_name = 'yelp'
 
     random_seed = 3
     learning_rate = 0.03
+    lr_decay_factor = 0.6
 
     action = 0
     plot_smoothing = 50
@@ -272,11 +287,11 @@ def main():
     parser.add_argument('-s', '--plot-smoothing', help="Window size of moving average smoothing", type=int, default=plot_smoothing)
 
     # Params
+    parser.add_argument('--floyd', help="If given, paths are set to work on floyd", action='store_true', default=False)
     parser.add_argument('-r', '--random-seed', type=int, default=random_seed)
     parser.add_argument('-l', '--learning-rate', type=float, default=learning_rate)
+    parser.add_argument('-u', '--lr-decay-factor', help="After each epoch: lr = lr * u", type=float, default=lr_decay_factor)
     parser.add_argument('-e', '--num-epochs', type=int, default=num_epochs)
-    parser.add_argument('-d', '--data-path', type=str, default=data_path)
-    parser.add_argument('-n', '--data-name', help="Name of the dataset (for savefile naming)", type=str, default=data_name)
     parser.add_argument('-f', '--retrain-embedding', help="Retrain the word embedding", action='store_true', default=(not freeze_embedding))
     parser.add_argument('-b', '--batch-size', type=int, default=batch_size)
     parser.add_argument('-c', '--cuda', help="Enable cuda support", action='store_true', default=cuda)
@@ -328,7 +343,21 @@ def main():
         model_name += '-avg'
         gnn_output = DocSenModel.GnnOutput.AVG
 
-    model_path = '../models/' + model_name
+    if args.floyd:
+        if not os.path.exists('models'):
+            os.makedirs('models')
+        data_path = '/yelp/yelp_academic_dataset_review.json'
+        model_path = 'models/' + model_name
+        checkpoint_path = f"/checkpoint/models/{model_name}_checkpoint.tar"
+        w2v_path = '/yelp/'
+        prep_path = '/yelp/'
+        if os.path.isfile(checkpoint_path):
+            copyfile(checkpoint_path, model_path + '_checkpoint.tar')
+    else:
+        data_path = '../data/Yelp/2013_witte/yelp_academic_dataset_review.json'
+        model_path = '../models/' + model_name
+        w2v_path = '../data/Word2Vec/'
+        prep_path = '../data/Preprocessed/'
 
     if args.action == 1:
         plot_loss_up_to_checkpoint(model_path, smoothing_window=args.plot_smoothing)
@@ -341,8 +370,8 @@ def main():
         print(f"Random seed: {args.random_seed}")
         print(f"Reduced dataset: {args.reduced_dataset}")
 
-        # dataset = ImdbDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac, use_reduced_dataset=0)
-        dataset = YelpDataset(args.data_path, args.data_name, w2v_sample_frac=w2v_sample_frac, use_reduced_dataset=args.reduced_dataset)
+        dataset = YelpDataset(data_path, args.data_name, w2v_sample_frac=w2v_sample_frac,
+                              use_reduced_dataset=args.reduced_dataset, w2v_path=w2v_path, prep_path=prep_path)
 
         print(f"Number of classes: {dataset.num_classes}")
         print(f"Batch size: {args.batch_size}")
@@ -357,8 +386,8 @@ def main():
         model = DocSenModel(dataset.num_classes, sentence_model, gnn_output, gnn_type, dataset.embedding, freeze_embedding, cuda=args.cuda)
 
         if args.action == 0:
-            train(args.batch_size, dataset, args.learning_rate, model, args.num_epochs, args.random_seed, shuffle_dataset, validation_split,
-                  model_path)
+            train(args.batch_size, dataset, args.learning_rate, lr_decay_factor, model, args.num_epochs,
+                  args.random_seed, shuffle_dataset, validation_split, model_path)
         else:
             evaluate(dataset, model, model_path)
 
