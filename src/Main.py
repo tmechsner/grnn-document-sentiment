@@ -1,7 +1,8 @@
 # For running on floyd, from within /src call something like:
-# floyd run --cpu --env pytorch-1.0 --data deratomkeks/datasets/yelp-2013-academic/2:yelp --data deratomkeks/projects/grnn-document-sentiment/34:/checkpoint 'python3 Main.py -a=0 -r 13 -l 0.01 -u 0.6 --sentence-model 1 --gnn-output 1 --gnn-type 1 --floyd'
+# floyd run --cpu --env pytorch-1.0 --data deratomkeks/datasets/yelp-2013-academic/2:yelp --data deratomkeks/projects/grnn-document-sentiment/34:/checkpoint 'python3 Main.py -a=0 -r 13 -l 0.01 -d 0.6 --sentence-model 1 --gnn-output 1 --gnn-type 1 --floyd'
 # where 34 here is the number of the run to continue.
 # To start a new training, discard the second '--data' option
+# To override the learning rate and decay rate of a checkpoint, specify both -l and -d options in the call!
 
 import os
 from shutil import copyfile
@@ -56,11 +57,12 @@ def train(batch_size, dataset, learning_rate, lr_decay_factor, model, num_epochs
         train_indices = checkpoint['train_indices']
         val_indices = checkpoint['val_indices']
         try:
-            learning_rate = checkpoint['learning_rate']
-            lr_decay_factor = checkpoint['lr_decay_factor']
+            if learning_rate == 0 or lr_decay_factor == 0:
+                learning_rate = checkpoint['learning_rate']
+                lr_decay_factor = checkpoint['lr_decay_factor']
+                learning_rate = learning_rate * lr_decay_factor
         except Exception:
             pass
-        learning_rate = learning_rate * lr_decay_factor
         print(f"Continue training in epoch {epoch_0+1} with learning rate {learning_rate}")
     else:
         print("Not loading a training checkpoint.")
@@ -163,6 +165,7 @@ def train(batch_size, dataset, learning_rate, lr_decay_factor, model, num_epochs
 
             if batch_num % 10 == 0:
                 print(f"  Epoch {epoch+1:>2} of {num_epochs} - Batch {batch_num+1:>5} of {len(dataloader_train):>5}  -"
+                      f" lr {learning_rate} -"
                       f"   Tr.-Loss: {train_loss[-1]:.4f}   Val.-Loss: {valid_loss[-1]:.4f}"
                       f"   Tr.-Acc.: {train_acc[-1]:.2f}   Val.-Acc.: {valid_acc[-1]:.2f}")
 
@@ -288,7 +291,7 @@ def main():
     parser.add_argument('--floyd', help="If given, paths are set to work on floyd", action='store_true', default=False)
     parser.add_argument('-r', '--random-seed', type=int, default=random_seed)
     parser.add_argument('-l', '--learning-rate', type=float, default=learning_rate)
-    parser.add_argument('-u', '--lr-decay-factor', help="After each epoch: lr = lr * u", type=float, default=lr_decay_factor)
+    parser.add_argument('-d', '--lr-decay-factor', help="After each epoch: lr = lr * u", type=float, default=lr_decay_factor)
     parser.add_argument('-e', '--num-epochs', type=int, default=num_epochs)
     parser.add_argument('-f', '--retrain-embedding', help="Retrain the word embedding", action='store_true', default=(not freeze_embedding))
     parser.add_argument('-b', '--batch-size', type=int, default=batch_size)
