@@ -328,7 +328,6 @@ def main():
         model_name += '-avg'
         gnn_output = DocSenModel.GnnOutput.AVG
 
-    model_name += f"-bs{args.batch_size}-epochs{args.num_epochs}-lr{args.learning_rate}"
     model_path = '../models/' + model_name
 
     if args.action == 1:
