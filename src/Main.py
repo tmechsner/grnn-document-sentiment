@@ -1,8 +1,7 @@
-# From within /src call:
-# floyd run --env pytorch-1.0 --data deratomkeks/datasets/yelp-2013-academic/2:yelp --data deratomkeks/projects/grnn-document-sentiment/15:/checkpoint "python3 Main.py"
-# where 15 here is the number of the run to continue.
-# Run the following to start a new training:
-# floyd run --env pytorch-1.0 --data deratomkeks/datasets/yelp-2013-academic/2:yelp "python3 Main.py"
+# For running on floyd, from within /src call something like:
+# floyd run --cpu --env pytorch-1.0 --data deratomkeks/datasets/yelp-2013-academic/2:yelp --data deratomkeks/projects/grnn-document-sentiment/34:/checkpoint 'python3 Main.py -a=0 -r 13 -l 0.01 -u 0.6 --sentence-model 1 --gnn-output 1 --gnn-type 1 --floyd'
+# where 34 here is the number of the run to continue.
+# To start a new training, discard the second '--data' option
 
 import os
 from shutil import copyfile
