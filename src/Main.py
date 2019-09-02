@@ -60,7 +60,8 @@ def train(batch_size, dataset, learning_rate, lr_decay_factor, model, num_epochs
             lr_decay_factor = checkpoint['lr_decay_factor']
         except Exception:
             pass
-        print(f"Continue training in epoch {epoch_0+1}")
+        learning_rate = learning_rate * lr_decay_factor
+        print(f"Continue training in epoch {epoch_0+1} with learning rate {learning_rate}")
     else:
         print("Not loading a training checkpoint.")
         train_loss = []
@@ -85,8 +86,6 @@ def train(batch_size, dataset, learning_rate, lr_decay_factor, model, num_epochs
             if epoch - min_loss_epoch >= early_stopping:
                 print(f"No training improvement over the last {early_stopping} epochs. Aborting.")
                 break
-
-        learning_rate = lr_decay_factor * learning_rate
 
         for batch_num, batch in enumerate(dataloader_train):
             # Forward pass for each single document in the batch
@@ -186,6 +185,9 @@ def train(batch_size, dataset, learning_rate, lr_decay_factor, model, num_epochs
             'lr_decay_factor': lr_decay_factor
         }, checkpoint_path + '_tmp')
         os.rename(checkpoint_path + '_tmp', checkpoint_path)
+
+        # Update Learning Rate
+        learning_rate = lr_decay_factor * learning_rate
 
 
 def evaluate(dataset, model, model_path):
