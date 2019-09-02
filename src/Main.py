@@ -380,7 +380,7 @@ def main():
         model = DocSenModel(dataset.num_classes, sentence_model, gnn_output, gnn_type, dataset.embedding, freeze_embedding, cuda=args.cuda)
 
         if args.action == 0:
-            train(args.batch_size, dataset, args.learning_rate, lr_decay_factor, model, args.num_epochs,
+            train(args.batch_size, dataset, args.learning_rate, args.lr_decay_factor, model, args.num_epochs,
                   args.random_seed, shuffle_dataset, validation_split, model_path)
         else:
             evaluate(dataset, model, model_path)
