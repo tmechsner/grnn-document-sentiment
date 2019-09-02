@@ -80,8 +80,6 @@ def train(batch_size, dataset, learning_rate, lr_decay_factor, model, num_epochs
     min_loss = 99999
     min_loss_epoch = epoch_0
     for epoch in range(epoch_0, num_epochs):
-        print(f'\nEpoch {epoch+1} of {num_epochs}')
-
         if early_stopping > 0:
             if epoch - min_loss_epoch >= early_stopping:
                 print(f"No training improvement over the last {early_stopping} epochs. Aborting.")
@@ -164,9 +162,9 @@ def train(batch_size, dataset, learning_rate, lr_decay_factor, model, num_epochs
             model.train()
 
             if batch_num % 10 == 0:
-                print(f"  Batch {batch_num+1:>5} of {len(dataloader_train):>5}  -"
-                      f"   Training-Loss: {train_loss[-1]:.4f}   Validation-Loss: {valid_loss[-1]:.4f}"
-                      f"   Training-Acc.: {train_acc[-1]:.2f}   Validation-Acc.: {valid_acc[-1]:.2f}")
+                print(f"  Epoch {epoch+1:>2} of {num_epochs} - Batch {batch_num+1:>5} of {len(dataloader_train):>5}  -"
+                      f"   Tr.-Loss: {train_loss[-1]:.4f}   Val.-Loss: {valid_loss[-1]:.4f}"
+                      f"   Tr.-Acc.: {train_acc[-1]:.2f}   Val.-Acc.: {valid_acc[-1]:.2f}")
 
         print("Saving training progress checkpoint...")
         if os.path.isfile(checkpoint_path):
@@ -202,16 +200,14 @@ def evaluate(dataset, model, model_path):
     epoch = checkpoint['epoch']
     val_indices = checkpoint['val_indices']
 
-    valid_sampler = sampler.SubsetRandomSampler(val_indices)
-
     print(f"Calculating accuracy of the model after {epoch+1} epochs of training...")
 
     matches = 0
     diffs = []
     processed_docs = 0
     for k, i in enumerate(val_indices):
-        if k % 10 == 0:
-            print(f"Data sample {k+1} of {len(val_indices)}")
+        if k % 100 == 0:
+            print(f"Data sample {k+1:>7} of {len(val_indices)}")
         (doc, label) = dataset[i]
         try:
             prediction = torch.argmax(model(doc))
@@ -378,6 +374,7 @@ def main():
         print(f"Batch size: {args.batch_size}")
         print(f"Number of epochs: {args.num_epochs}")
         print(f"Learning rate: {args.learning_rate}")
+        print(f"Decay rate: {args.lr_decay_factor}")
 
         if args.cuda:
             print("Using cuda")
