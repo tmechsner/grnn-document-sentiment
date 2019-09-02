@@ -199,8 +199,9 @@ def evaluate(dataset, model, model_path):
     model.load_state_dict(checkpoint['model_state_dict'])
     epoch = checkpoint['epoch']
     val_indices = checkpoint['val_indices']
+    learning_rate = checkpoint['learning_rate']
 
-    print(f"Calculating accuracy of the model after {epoch+1} epochs of training...")
+    print(f"Calculating accuracy of the model after {epoch+1} epochs of training (last lr: {learning_rate}...")
 
     matches = 0
     diffs = []
@@ -367,7 +368,7 @@ def main():
         print(f"Random seed: {args.random_seed}")
         print(f"Reduced dataset: {args.reduced_dataset}")
 
-        dataset = YelpDataset(data_path, args.data_name, w2v_sample_frac=w2v_sample_frac,
+        dataset = YelpDataset(data_path, data_name, w2v_sample_frac=w2v_sample_frac,
                               use_reduced_dataset=args.reduced_dataset, w2v_path=w2v_path, prep_path=prep_path)
 
         print(f"Number of classes: {dataset.num_classes}")
