@@ -34,7 +34,7 @@ def split_data(dataset, random_seed, shuffle_dataset, validation_split):
     return indices[split:], indices[:split]
 
 
-def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, shuffle_dataset, validation_split,
+def train(batch_size, dataset, learning_rate, lr_decay_factor, model, num_epochs, random_seed, shuffle_dataset, validation_split,
           model_path, continue_training=True, early_stopping=2):
 
     loss_function = torch.nn.CrossEntropyLoss()
@@ -56,6 +56,11 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
         valid_acc = checkpoint['valid_acc']
         train_indices = checkpoint['train_indices']
         val_indices = checkpoint['val_indices']
+        try:
+            learning_rate = checkpoint['learning_rate']
+            lr_decay_factor = checkpoint['lr_decay_factor']
+        except Exception:
+            pass
         print(f"Continue training in epoch {epoch_0+1}")
     else:
         print("Not loading a training checkpoint.")
@@ -81,6 +86,8 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             if epoch - min_loss_epoch >= early_stopping:
                 print(f"No training improvement over the last {early_stopping} epochs. Aborting.")
                 break
+
+        learning_rate = lr_decay_factor * learning_rate
 
         for batch_num, batch in enumerate(dataloader_train):
             # Forward pass for each single document in the batch
@@ -175,7 +182,9 @@ def train(batch_size, dataset, learning_rate, model, num_epochs, random_seed, sh
             'train_acc': train_acc,
             'valid_acc': valid_acc,
             'train_indices': train_indices,
-            'val_indices': val_indices
+            'val_indices': val_indices,
+            'learning_rate': learning_rate,
+            'lr_decay_factor': lr_decay_factor
         }, checkpoint_path + '_tmp')
         os.rename(checkpoint_path + '_tmp', checkpoint_path)
 
@@ -271,6 +280,7 @@ def main():
 
     random_seed = 3
     learning_rate = 0.03
+    lr_decay_factor = 0.6
 
     action = 0
 
@@ -282,6 +292,7 @@ def main():
     # Params
     parser.add_argument('-r', '--random-seed', type=int, default=random_seed)
     parser.add_argument('-l', '--learning-rate', type=float, default=learning_rate)
+    parser.add_argument('-u', '--lr-decay-factor', help="After each epoch: lr = lr * u", type=float, default=lr_decay_factor)
     parser.add_argument('-e', '--num-epochs', type=int, default=num_epochs)
     parser.add_argument('-d', '--data-path', type=str, default=data_path)
     parser.add_argument('-n', '--data-name', help="Name of the dataset (for savefile naming)", type=str, default=data_name)
@@ -369,8 +380,8 @@ def main():
         model = DocSenModel(dataset.num_classes, sentence_model, gnn_output, gnn_type, dataset.embedding, freeze_embedding, cuda=args.cuda)
 
         if args.action == 0:
-            train(args.batch_size, dataset, args.learning_rate, model, args.num_epochs, args.random_seed, shuffle_dataset, validation_split,
-                  model_path)
+            train(args.batch_size, dataset, args.learning_rate, lr_decay_factor, model, args.num_epochs,
+                  args.random_seed, shuffle_dataset, validation_split, model_path)
         else:
             evaluate(dataset, model, model_path)
 
