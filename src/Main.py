@@ -336,9 +336,8 @@ def main():
         model_name += '-avg'
         gnn_output = DocSenModel.GnnOutput.AVG
 
-    model_name += f"-bs{args.batch_size}-epochs{args.num_epochs}-lr{args.learning_rate}"
     model_path = 'models/' + model_name
-    checkpoint_path = '/checkpoint/models/' + model_name + '_checkpoint.tar'
+    checkpoint_path = f"/checkpoint/models/{model_name}_checkpoint.tar"
     if os.path.isfile(checkpoint_path):
         copyfile(checkpoint_path, model_path + '_checkpoint.tar')
 
