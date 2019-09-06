@@ -81,7 +81,6 @@ class YelpDataset(Dataset):
         :return: List of documents with vocabulary indices instead of words, list of ratings and word embedding matrix
         """
         if self._overwrite or \
-                (not os.path.isfile(self._X_text_path())) or \
                 (not os.path.isfile(self._X_path())) or \
                 (not os.path.isfile(self._y_path())):
             print("No persisted data found. Preprocessing data...")

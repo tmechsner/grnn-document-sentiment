@@ -34,21 +34,15 @@ def split_data(dataset, random_seed, shuffle_dataset, validation_split):
     return indices[split:], indices[:split]
 
 
-def train(batch_size, dataset, learning_rate, lr_decay_factor, model, num_epochs, random_seed, shuffle_dataset, validation_split,
+def train(batch_size, dataset, learning_rate, lr_decay_factor, l2_reg, model, num_epochs, random_seed, shuffle_dataset, validation_split,
           model_path, continue_training=True, early_stopping=2):
-
-    loss_function = torch.nn.CrossEntropyLoss()
-
-    # Todo: Which optimizer to use? In Paper: Simple SGD, no Momentum
-    # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
 
     checkpoint_path = model_path + '_checkpoint.tar'
     if continue_training and os.path.isfile(checkpoint_path):
         print("Loading checkpoint to continue training...")
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch_0 = checkpoint['epoch'] + 1
         train_loss = checkpoint['train_loss']
         valid_loss = checkpoint['valid_loss']
@@ -72,6 +66,10 @@ def train(batch_size, dataset, learning_rate, lr_decay_factor, model, num_epochs
         valid_acc = []
         epoch_0 = 0
         train_indices, val_indices = split_data(dataset, random_seed, shuffle_dataset, validation_split)
+
+    loss_function = torch.nn.CrossEntropyLoss()
+
+    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, weight_decay=l2_reg)
 
     train_sampler = sampler.SubsetRandomSampler(train_indices)
     valid_sampler = sampler.SubsetRandomSampler(val_indices)
@@ -189,6 +187,7 @@ def train(batch_size, dataset, learning_rate, lr_decay_factor, model, num_epochs
 
         # Update Learning Rate
         learning_rate = lr_decay_factor * learning_rate
+        optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, weight_decay=l2_reg)
 
 
 def evaluate(dataset, model, model_path):
@@ -277,6 +276,7 @@ def main():
     random_seed = 3
     learning_rate = 0.03
     lr_decay_factor = 0.6
+    l2_reg = 1e-5
 
     action = 0
     plot_smoothing = 50
@@ -292,6 +292,7 @@ def main():
     parser.add_argument('-r', '--random-seed', type=int, default=random_seed)
     parser.add_argument('-l', '--learning-rate', type=float, default=learning_rate)
     parser.add_argument('-d', '--lr-decay-factor', help="After each epoch: lr = lr * u", type=float, default=lr_decay_factor)
+    parser.add_argument('-g', '--l2-reg-factor', help=f"L2 regularization (default: {l2_reg})", type=float, default=l2_reg)
     parser.add_argument('-e', '--num-epochs', type=int, default=num_epochs)
     parser.add_argument('-f', '--retrain-embedding', help="Retrain the word embedding", action='store_true', default=(not freeze_embedding))
     parser.add_argument('-b', '--batch-size', type=int, default=batch_size)
@@ -379,6 +380,7 @@ def main():
         print(f"Number of epochs: {args.num_epochs}")
         print(f"Learning rate: {args.learning_rate}")
         print(f"Decay rate: {args.lr_decay_factor}")
+        print(f"L2 regularization: {args.l2_reg_factor}")
 
         if args.cuda:
             print("Using cuda")
@@ -388,7 +390,7 @@ def main():
         model = DocSenModel(dataset.num_classes, sentence_model, gnn_output, gnn_type, dataset.embedding, freeze_embedding, cuda=args.cuda)
 
         if args.action == 0:
-            train(args.batch_size, dataset, args.learning_rate, args.lr_decay_factor, model, args.num_epochs,
+            train(args.batch_size, dataset, args.learning_rate, args.lr_decay_factor, args.l2_reg_factor, model, args.num_epochs,
                   args.random_seed, shuffle_dataset, validation_split, model_path)
         else:
             evaluate(dataset, model, model_path)
