@@ -67,7 +67,7 @@ class YelpDataset(Dataset):
 
     def __getitem__(self, index):
         """
-        Get tuple of data and label, where the label is the index of the class in ImdbDataset.classes.
+        Get tuple of data and label, where the label is the index of the class in YelpDataset.classes.
         """
         return self._X_data[index], self.classes.index(int(self._y_data[index]))
 
@@ -77,7 +77,7 @@ class YelpDataset(Dataset):
     def _load(self, use_reduced_dataset) -> Tuple[
         List[TDocumentInd], List[TRating], TEmbedding, Dict[TWord, TVocabIndex]]:
         """
-        Preprocess IMDB data: Extract text and rating data and replace words by vocabulary ids.
+        Preprocess Yelp data: Extract text and rating data and replace words by vocabulary ids.
         :return: List of documents with vocabulary indices instead of words, list of ratings and word embedding matrix
         """
         if self._overwrite or \
@@ -178,10 +178,3 @@ class YelpDataset(Dataset):
 
     def _X_path(self) -> str:
         return os.path.join(self._prep_path, f"X_{self._name}")
-
-
-if __name__ == '__main__':
-    p = YelpDataset('data/Dev/imdb-dev.txt.ss', 'imdb-dev', w2v_sample_frac=0.9)
-    print(p[0])
-    print(' '.join(list(map(lambda index: p.index2word[index], p[0][0][0]))))
-    pass
