@@ -103,7 +103,7 @@ def train(batch_size, dataset, learning_rate, lr_decay_factor, l2_reg, model, nu
 
                     if label == torch.argmax(prediction):
                         matches += 1
-                except AttributeError as e:
+                except (AttributeError, RuntimeError) as e:
                     print("Some error occurred. Ignoring this document. Error:")
                     print(e)
                     continue
@@ -146,7 +146,7 @@ def train(batch_size, dataset, learning_rate, lr_decay_factor, l2_reg, model, nu
 
                     if label == torch.argmax(prediction):
                         matches += 1
-                except AttributeError as e:
+                except (AttributeError, RuntimeError) as e:
                     print("Some error occurred. Ignoring this document. Error:")
                     print(e)
                     continue
@@ -275,7 +275,7 @@ def main():
 
     random_seed = 3
     learning_rate = 0.03
-    lr_decay_factor = 0.6
+    lr_decay_factor = 0.8
     l2_reg = 1e-5
 
     action = 0
@@ -291,7 +291,7 @@ def main():
     parser.add_argument('--floyd', help="If given, paths are set to work on floyd", action='store_true', default=False)
     parser.add_argument('-r', '--random-seed', type=int, default=random_seed)
     parser.add_argument('-l', '--learning-rate', type=float, default=learning_rate)
-    parser.add_argument('-d', '--lr-decay-factor', help="After each epoch: lr = lr * u", type=float, default=lr_decay_factor)
+    parser.add_argument('-d', '--lr-decay-factor', help="After each epoch: lr = lr * d", type=float, default=lr_decay_factor)
     parser.add_argument('-g', '--l2-reg-factor', help=f"L2 regularization (default: {l2_reg})", type=float, default=l2_reg)
     parser.add_argument('-e', '--num-epochs', type=int, default=num_epochs)
     parser.add_argument('-f', '--retrain-embedding', help="Retrain the word embedding", action='store_true', default=(not freeze_embedding))
@@ -301,8 +301,8 @@ def main():
                                                         " If > 0, use only two classes and a fraction of"
                                                         " <reduced-dataset> of the data.", action='store_true', default=0)
     # Model architecture
-    parser.add_argument('--sentence-model', help="0=convolution, 1=lstm)", type=int, default=0)
-    parser.add_argument('--gnn-output', help="0=last, 1=avg)", type=int, default=0)
+    parser.add_argument('--sentence-model', help="0=convolution, 1=lstm", type=int, default=0)
+    parser.add_argument('--gnn-output', help="0=last, 1=avg", type=int, default=0)
     parser.add_argument('--gnn-type', help="0=forward, 1=forward-backward (requires gnn-output=1)", type=int, default=0)
 
     args = parser.parse_args()
