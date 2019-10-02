@@ -5,6 +5,7 @@ Original Paper:
 https://pdfs.semanticscholar.org/82ad/2ca5fdca7e6721c0fc1d97d029b25a11328b.pdf
 
 ## Setup
+Install requirements with `pip install -r requirements.txt`.
 Setup the following file structure within the data directory:
 
 ``` 
